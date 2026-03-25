@@ -78,12 +78,12 @@ class RoomCard extends StatelessWidget {
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Icon(
-                              Icons.people_rounded,
-                              size: 14,
-                              color: AppColors.textSecondary,
-                            ),
+                            // const SizedBox(width: 12),
+                            // Icon(
+                            //   Icons.people_rounded,
+                            //   size: 14,
+                            //   color: AppColors.textSecondary,
+                            // ),
                             // const SizedBox(width: 4),
                             // Text(
                             //   '${room.memberCount}',

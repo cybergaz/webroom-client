@@ -15,9 +15,11 @@ part 'auth_provider.freezed.dart';
 sealed class AuthState with _$AuthState {
   const factory AuthState.initial() = AuthStateInitial;
   const factory AuthState.loading() = AuthStateLoading;
-  const factory AuthState.authenticated({required UserModel user}) = AuthStateAuthenticated;
+  const factory AuthState.authenticated({required UserModel user}) =
+      AuthStateAuthenticated;
   const factory AuthState.unauthenticated() = AuthStateUnauthenticated;
-  const factory AuthState.pendingApproval({String? requestId}) = AuthStatePendingApproval;
+  const factory AuthState.pendingApproval({String? requestId}) =
+      AuthStatePendingApproval;
 }
 
 class AuthNotifier extends Notifier<AuthState> {
@@ -50,7 +52,10 @@ class AuthNotifier extends Notifier<AuthState> {
     final getstreamToken = await storage.read(StorageKeys.getstreamToken);
 
     if (userId != null && roleStr != null) {
-      final role = UserRole.values.firstWhere((r) => r.name == roleStr, orElse: () => UserRole.user);
+      final role = UserRole.values.firstWhere(
+        (r) => r.name == roleStr,
+        orElse: () => UserRole.user,
+      );
       final user = UserModel(
         userId: userId,
         name: userName,
@@ -58,13 +63,19 @@ class AuthNotifier extends Notifier<AuthState> {
         role: role,
         status: userStatus ?? 'approved',
       );
-      // Re-initialize StreamVideo for this user session
+      // Re-initialize StreamVideo for this user session.
+      // Wrapped in try/catch so a GetStream failure doesn't block auth.
       if (getstreamToken != null) {
-        await initStreamVideo(
-          userId: userId,
-          userName: userName,
-          getstreamToken: getstreamToken,
-        );
+        try {
+          await ref.read(getstreamStateProvider.notifier).init(
+            userId: userId,
+            userName: userName,
+            getstreamToken: getstreamToken,
+            role: role,
+          );
+        } catch (e) {
+          print('StreamVideo init failed on restore, will retry on room entry: $e');
+        }
       }
       state = AuthState.authenticated(user: user);
     } else {
@@ -72,12 +83,22 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
-  Future<String> signup({required String name, required String password, String? phone, String? email}) async {
+  Future<String> signup({
+    required String name,
+    required String password,
+    String? phone,
+    String? email,
+  }) async {
     final repo = AuthRepositoryImpl(
       AuthRemoteDatasource(ref.read(dioClientProvider)),
       ref.read(secureStorageProvider),
     );
-    final requestId = await repo.signup(name: name, password: password, phone: phone, email: email);
+    final requestId = await repo.signup(
+      name: name,
+      password: password,
+      phone: phone,
+      email: email,
+    );
     final storage = ref.read(secureStorageProvider);
     await storage.write(StorageKeys.userStatus, 'pending_approval');
     await storage.write(StorageKeys.requestId, requestId);
@@ -94,20 +115,23 @@ class AuthNotifier extends Notifier<AuthState> {
     final result = await repo.login(phone: phone, password: password);
 
     // Persist user name for StreamVideo re-init on next app launch
-    await ref.read(secureStorageProvider).write(StorageKeys.userName, result.user.name);
+    await ref
+        .read(secureStorageProvider)
+        .write(StorageKeys.userName, result.user.name);
 
     // Initialize GetStream SDK for this user
-    await initStreamVideo(
+    await ref.read(getstreamStateProvider.notifier).init(
       userId: result.user.userId,
       userName: result.user.name,
       getstreamToken: result.getstreamToken,
+      role: result.user.role,
     );
 
     state = AuthState.authenticated(user: result.user);
   }
 
   Future<void> logout() async {
-    await disposeStreamVideo();
+    await ref.read(getstreamStateProvider.notifier).dispose();
     final repo = AuthRepositoryImpl(
       AuthRemoteDatasource(ref.read(dioClientProvider)),
       ref.read(secureStorageProvider),
@@ -117,4 +141,6 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 }
 
-final authStateProvider = NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
+final authStateProvider = NotifierProvider<AuthNotifier, AuthState>(
+  AuthNotifier.new,
+);

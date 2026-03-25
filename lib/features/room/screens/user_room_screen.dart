@@ -1,11 +1,15 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:stream_video_flutter/stream_video_flutter.dart';
+import 'package:stream_video/stream_video.dart';
+
 import '../providers/getstream_provider.dart';
 import '../providers/room_session_provider.dart';
 import '../providers/ptt_provider.dart';
+import '../widgets/call_controls_bar.dart';
+import '../widgets/participants_grid.dart';
 import '../../../core/network/websocket_service.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/constants/storage_keys.dart';
@@ -71,102 +75,52 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sessionAsync = ref.watch(roomSessionProvider);
-    final pttState = ref.watch(pttStateProvider);
-
     ref.listen(roomSessionProvider, (_, next) {
       next.whenData((session) {
         if (session.isEnded && mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Room ended by host')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Room ended by host')),
+          );
           context.go('/home');
         }
       });
     });
 
     final call = ref.watch(activeCallProvider);
+    final roomName = ref.watch(roomSessionProvider).value?.roomName ?? '';
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        title: Text(roomName, style: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w600)),
+        centerTitle: true,
+        automaticallyImplyLeading: false,
+      ),
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
             if (call == null)
-              const Expanded(child: Center(child: CircularProgressIndicator()))
-            else
-              Expanded(
-                child: StreamCallContainer(
-                  call: call,
-                  // callContentWidgetBuilder: (context, call) {
-                  //     return MyOwnCallContent(call: call);
-                  // },
-                ),
+              const Expanded(
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else ...[
+              // Participants area
+              Expanded(child: ParticipantsGrid(call: call)),
+              // Custom controls (no Members button for regular users)
+              CallControlsBar(
+                call: call,
+                isHost: false,
+                onEndOrLeave: () async {
+                  await ref
+                      .read(pttStateProvider.notifier)
+                      .stopTransmitting();
+                  await ref.read(roomSessionProvider.notifier).leaveRoom();
+                  if (context.mounted) context.go('/home');
+                },
               ),
-            // const ConnectionStatusBar(),
-            // sessionAsync.when(
-            //   loading: () => const SizedBox.shrink(),
-            //   error: (_, _) => const SizedBox.shrink(),
-            //   data: (session) => RoomHeader(
-            //     roomId: widget.roomId,
-            //     roomName: session.roomName,
-            //   ),
-            // ),
-            // Expanded(
-            //   child: sessionAsync.when(
-            //     loading: () => const Center(child: CircularProgressIndicator()),
-            //     error: (e, _) => Center(
-            //       child: Text(mapErrorToMessage(e), style: const TextStyle(color: AppColors.error)),
-            //     ),
-            //     data: (session) => switch ((session.isInCall, session.status)) {
-            //       (true, _) => Column(
-            //           mainAxisAlignment: MainAxisAlignment.center,
-            //           children: [
-            //             PulseAnimation(
-            //               isActive: pttState.isTransmitting,
-            //               color: AppColors.accent,
-            //               child: const PttButton(),
-            //             ),
-            //             const SizedBox(height: 32),
-            //             const PttWaveform(),
-            //           ],
-            //         ),
-            //       (false, RoomStatus.live) => _JoinView(
-            //           onJoin: () => ref.read(roomSessionProvider.notifier).joinRoomAndEnter(),
-            //         ),
-            //       (false, RoomStatus.active) => _WaitingView(
-            //           onRefresh: () => ref.read(roomSessionProvider.notifier).refreshRoom(),
-            //         ),
-            //       (false, RoomStatus.inactive) => const _DisabledView(),
-            //       (false, RoomStatus.ended) => const _DisabledView(message: 'This room has ended.'),
-            //     },
-            //   ),
-            // ),
-            // sessionAsync.maybeWhen(
-            //   data: (session) => session.isInCall
-            //       ? Padding(
-            //           padding: const EdgeInsets.all(24),
-            //           child: SizedBox(
-            //             width: double.infinity,
-            //             child: OutlinedButton.icon(
-            //               style: OutlinedButton.styleFrom(
-            //                 foregroundColor: AppColors.error,
-            //                 side: const BorderSide(color: AppColors.error),
-            //               ),
-            //               icon: const Icon(Icons.call_end_rounded),
-            //               label: const Text('Leave Room'),
-            //               onPressed: () async {
-            //                 await ref.read(pttStateProvider.notifier).stopTransmitting();
-            //                 await ref.read(roomSessionProvider.notifier).leaveRoom();
-            //                 if (context.mounted) context.go('/home');
-            //               },
-            //             ),
-            //           ),
-            //         )
-            //       : const SizedBox.shrink(),
-            //   orElse: () => const SizedBox.shrink(),
-            // ),
+            ],
           ],
         ),
       ),

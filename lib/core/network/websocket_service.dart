@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../constants/app_constants.dart';
@@ -58,6 +59,14 @@ class WebSocketService {
       _channelSubscription = _channel!.stream.listen(
         (data) {
           final json = jsonDecode(data as String) as Map<String, dynamic>;
+          // Intercept auth errors before forwarding to listeners
+          if (json['type'] == 'socket:error') {
+            final code = json['error_code'] as String?;
+            if (code == 'AUTH_REQUIRED' || code == 'AUTH_INVALID') {
+              _refreshTokenAndReconnect();
+              return;
+            }
+          }
           _eventController.add(json);
         },
         onDone: _onDisconnected,
@@ -79,6 +88,48 @@ class WebSocketService {
   void sendSpeakingEvent(String type) {
     if (_currentState != WsConnectionState.connected) return;
     _channel?.sink.add(jsonEncode({'type': type}));
+  }
+
+  Future<void> _refreshTokenAndReconnect() async {
+    print('WS auth error — refreshing token');
+    _heartbeatTimer?.cancel();
+    _channelSubscription?.cancel();
+    _channelSubscription = null;
+    _updateState(WsConnectionState.disconnected);
+
+    try {
+      final refreshToken = await _storage.read(StorageKeys.refreshToken);
+      if (refreshToken == null) {
+        await _storage.deleteAll();
+        return;
+      }
+
+      final dio = Dio(BaseOptions(
+        baseUrl: AppConstants.baseUrl,
+        headers: {'Content-Type': 'application/json'},
+      ));
+      final response = await dio.post(
+        '/auth/refresh',
+        data: {'refreshToken': refreshToken},
+      );
+
+      await _storage.write(
+        StorageKeys.accessToken,
+        response.data['accessToken'] as String,
+      );
+      await _storage.write(
+        StorageKeys.refreshToken,
+        response.data['refreshToken'] as String,
+      );
+
+      _isConnecting = false;
+      _currentState = WsConnectionState.disconnected;
+      _reconnectAttempts = 0;
+      await connect();
+    } catch (e) {
+      print('WS token refresh failed: $e');
+      // Do NOT clear storage here — HTTP auth interceptor owns that decision
+    }
   }
 
   void _startHeartbeat() {

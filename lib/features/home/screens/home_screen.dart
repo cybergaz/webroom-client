@@ -111,45 +111,45 @@ class HomeScreen extends ConsumerWidget {
           ],
         ),
       ),
-      floatingActionButton: user?.role == UserRole.host
-          ? FloatingActionButton.extended(
-              backgroundColor: AppColors.accent,
-              foregroundColor: Colors.white,
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: AppColors.surface,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
-                  builder: (_) => const CreateRoomSheet(),
-                );
-              },
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Create Room'),
-            )
-          : FloatingActionButton.extended(
-              backgroundColor: AppColors.accent,
-              foregroundColor: Colors.white,
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: AppColors.surface,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
-                  builder: (_) => const JoinByIdSheet(),
-                );
-              },
-              icon: const Icon(Icons.login_rounded),
-              label: const Text('Join Room'),
-            ),
+      // floatingActionButton: user?.role == UserRole.host
+      //     ? FloatingActionButton.extended(
+      //         backgroundColor: AppColors.accent,
+      //         foregroundColor: Colors.white,
+      //         onPressed: () {
+      //           showModalBottomSheet(
+      //             context: context,
+      //             isScrollControlled: true,
+      //             backgroundColor: AppColors.surface,
+      //             shape: const RoundedRectangleBorder(
+      //               borderRadius: BorderRadius.vertical(
+      //                 top: Radius.circular(20),
+      //               ),
+      //             ),
+      //             builder: (_) => const CreateRoomSheet(),
+      //           );
+      //         },
+      //         icon: const Icon(Icons.add_rounded),
+      //         label: const Text('Create Room'),
+      //       )
+      //     : FloatingActionButton.extended(
+      //         backgroundColor: AppColors.accent,
+      //         foregroundColor: Colors.white,
+      //         onPressed: () {
+      //           showModalBottomSheet(
+      //             context: context,
+      //             isScrollControlled: true,
+      //             backgroundColor: AppColors.surface,
+      //             shape: const RoundedRectangleBorder(
+      //               borderRadius: BorderRadius.vertical(
+      //                 top: Radius.circular(20),
+      //               ),
+      //             ),
+      //             builder: (_) => const JoinByIdSheet(),
+      //           );
+      //         },
+      //         icon: const Icon(Icons.login_rounded),
+      //         label: const Text('Join Room'),
+      //       ),
     );
   }
 }

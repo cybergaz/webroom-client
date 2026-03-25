@@ -4,7 +4,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../domain/enums/user_role.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -14,29 +13,43 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
+  bool _navigated = false;
+
   @override
   void initState() {
     super.initState();
-    _checkAndNavigate();
+    // Give the animation a minimum display time, then start checking
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (!mounted) return;
+      // If auth already resolved during the delay, navigate now
+      _tryNavigate(ref.read(authStateProvider));
+    });
   }
 
-  Future<void> _checkAndNavigate() async {
-    await Future.delayed(const Duration(milliseconds: 1500));
-    if (!mounted) return;
-
-    final authState = ref.read(authStateProvider);
+  void _tryNavigate(AuthState authState) {
+    if (_navigated || !mounted) return;
     switch (authState) {
-      case AuthStateAuthenticated(:final user):
+      case AuthStateInitial():
+      case AuthStateLoading():
+        return; // still resolving — wait for listener
+      case AuthStateAuthenticated():
+        _navigated = true;
         context.go('/home');
       case AuthStatePendingApproval():
+        _navigated = true;
         context.go('/signup/success');
-      default:
+      case AuthStateUnauthenticated():
+        _navigated = true;
         context.go('/login');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthState>(authStateProvider, (_, next) {
+      _tryNavigate(next);
+    });
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Center(

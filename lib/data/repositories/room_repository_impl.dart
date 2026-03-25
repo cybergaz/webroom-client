@@ -1,3 +1,4 @@
+import '../models/room_member_model.dart';
 import '../models/room_model.dart';
 import '../datasources/room_remote_datasource.dart';
 import 'room_repository.dart';
@@ -35,6 +36,7 @@ class RoomRepositoryImpl implements RoomRepository {
       bool isHost,
       String getstreamToken,
       String getstreamCallType,
+      List<dynamic> allMembers,
     })
   >
   getRoom(String roomId) async {
@@ -47,11 +49,13 @@ class RoomRepositoryImpl implements RoomRepository {
     final getstreamToken = data['getstreamToken'] as String? ?? '';
     final getstreamCallType =
         data['getstreamCallType'] as String? ?? 'audio_room';
+    final allMembers = data['allMembers'] as List<dynamic>? ?? [];
     return (
       room: room,
       isHost: isHost,
       getstreamToken: getstreamToken,
       getstreamCallType: getstreamCallType,
+      allMembers: allMembers,
     );
   }
 
@@ -93,6 +97,15 @@ class RoomRepositoryImpl implements RoomRepository {
   @override
   Future<Map<String, dynamic>> endRoom(String roomId) async {
     return _datasource.endRoom(roomId);
+  }
+
+  @override
+  Future<List<RoomMemberModel>> getMembers(String roomId) async {
+    final data = await _datasource.getMembers(roomId);
+    final list = data['members'] as List<dynamic>;
+    return list
+        .map((m) => RoomMemberModel.fromJson(m as Map<String, dynamic>))
+        .toList();
   }
 
   @override
