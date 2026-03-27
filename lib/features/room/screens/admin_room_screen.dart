@@ -10,6 +10,7 @@ import '../widgets/call_controls_bar.dart';
 import '../widgets/participants_grid.dart';
 import 'call_participants_screen.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/router/app_router.dart';
 
 class AdminRoomScreen extends ConsumerStatefulWidget {
   final String roomId;
@@ -21,19 +22,28 @@ class AdminRoomScreen extends ConsumerStatefulWidget {
 }
 
 class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
+  late final IsOnRoomScreenNotifier _roomScreenNotifier;
+
   @override
   void initState() {
     super.initState();
+    _roomScreenNotifier = ref.read(isOnRoomScreenProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _roomScreenNotifier.set(true);
       ref.read(roomSessionProvider.notifier).loadRoom(widget.roomId);
     });
   }
 
   @override
+  void dispose() {
+    Future.microtask(() => _roomScreenNotifier.set(false));
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final sessionAsync = ref.watch(roomSessionProvider);
-    final session = sessionAsync.value;
-    final roomName = session?.roomName ?? '';
+    final sessionState = ref.watch(roomSessionProvider);
+    final roomName = sessionState.isLoading ? '' : (sessionState.value?.roomName ?? '');
 
     ref.listen(roomSessionProvider, (_, next) {
       next.whenData((session) {
@@ -49,9 +59,15 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
-        title: Text(roomName, style: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w600)),
+        title: Text(
+          roomName.isEmpty ? '' : roomName,
+          style: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w600),
+        ),
         centerTitle: true,
-        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textSecondary),
+          onPressed: () => context.go('/home'),
+        ),
         actions: [
           if (call != null)
             IconButton(
@@ -69,60 +85,20 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
       ),
       body: SafeArea(
         bottom: false,
-        child: _buildBody(sessionAsync, call),
+        child: Column(
+          children: [
+            if (call == null)
+              const Expanded(child: Center(child: CircularProgressIndicator()))
+            else ...[
+              // Participants area
+              Expanded(child: ParticipantsGrid(call: call)),
+              // Custom controls
+              _buildControls(call),
+            ],
+          ],
+        ),
       ),
     );
-  }
-
-  Widget _buildBody(AsyncValue<RoomSession> sessionAsync, Call? call) {
-    // Loading state
-    if (sessionAsync.isLoading && sessionAsync.value == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    // Error state
-    if (sessionAsync.hasError && sessionAsync.value == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: AppColors.error),
-              const SizedBox(height: 16),
-              Text(
-                sessionAsync.error.toString(),
-                style: const TextStyle(color: AppColors.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              OutlinedButton(
-                onPressed: () => ref.read(roomSessionProvider.notifier).loadRoom(widget.roomId),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final session = sessionAsync.value;
-    if (session == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    // In call — show participants grid + controls
-    if (session.isInCall && call != null) {
-      return Column(
-        children: [
-          Expanded(child: ParticipantsGrid(call: call)),
-          _buildControls(call),
-        ],
-      );
-    }
-
-    // Room not started yet — show pre-call host view with Start button
-    return _PreCallHostView(roomId: widget.roomId);
   }
 
   Widget _buildControls(Call call) {
@@ -143,20 +119,13 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
   }
 }
 
-class _PreCallHostView extends ConsumerStatefulWidget {
+class _PreCallHostView extends ConsumerWidget {
   final String roomId;
 
   const _PreCallHostView({required this.roomId});
 
   @override
-  ConsumerState<_PreCallHostView> createState() => _PreCallHostViewState();
-}
-
-class _PreCallHostViewState extends ConsumerState<_PreCallHostView> {
-  bool _isStarting = false;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -191,33 +160,10 @@ class _PreCallHostViewState extends ConsumerState<_PreCallHostView> {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              icon: _isStarting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.play_arrow_rounded),
-              label: Text(
-                _isStarting ? 'Starting...' : 'Start Room',
-                style: const TextStyle(fontSize: 16),
-              ),
-              onPressed: _isStarting
-                  ? null
-                  : () async {
-                      setState(() => _isStarting = true);
-                      try {
-                        await ref.read(roomSessionProvider.notifier).startRoomAndEnter();
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to start room: $e')),
-                          );
-                        }
-                      } finally {
-                        if (mounted) setState(() => _isStarting = false);
-                      }
-                    },
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('Start Room', style: TextStyle(fontSize: 16)),
+              onPressed: () =>
+                  ref.read(roomSessionProvider.notifier).startRoomAndEnter(),
             ),
           ),
           const SizedBox(height: 12),
@@ -231,41 +177,39 @@ class _PreCallHostViewState extends ConsumerState<_PreCallHostView> {
               ),
               icon: const Icon(Icons.delete_outline_rounded),
               label: const Text('Delete Room', style: TextStyle(fontSize: 16)),
-              onPressed: _isStarting
-                  ? null
-                  : () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          backgroundColor: AppColors.surface,
-                          title: const Text(
-                            'Delete Room',
-                            style: TextStyle(color: AppColors.textPrimary),
-                          ),
-                          content: const Text(
-                            'This will permanently delete the room.',
-                            style: TextStyle(color: AppColors.textSecondary),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, false),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, true),
-                              child: const Text(
-                                'Delete',
-                                style: TextStyle(color: AppColors.error),
-                              ),
-                            ),
-                          ],
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: AppColors.surface,
+                    title: const Text(
+                      'Delete Room',
+                      style: TextStyle(color: AppColors.textPrimary),
+                    ),
+                    content: const Text(
+                      'This will permanently delete the room.',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text(
+                          'Delete',
+                          style: TextStyle(color: AppColors.error),
                         ),
-                      );
-                      if (confirmed == true && context.mounted) {
-                        await ref.read(roomSessionProvider.notifier).deleteRoom();
-                        if (context.mounted) context.go('/home');
-                      }
-                    },
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true && context.mounted) {
+                  await ref.read(roomSessionProvider.notifier).deleteRoom();
+                  if (context.mounted) context.go('/home');
+                }
+              },
             ),
           ),
         ],

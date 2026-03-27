@@ -10,6 +10,8 @@ import '../../../shared/widgets/connection_status_bar.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/error_mapper.dart';
 import '../../../domain/enums/user_role.dart';
+import '../../room/providers/getstream_provider.dart';
+import '../../room/providers/room_session_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -95,8 +97,29 @@ class HomeScreen extends ConsumerWidget {
                             (context, i) => RoomCard(
                               room: rooms[i],
                               animationIndex: i,
-                              onTap: () => {
-                                context.push('/room/${rooms[i].roomId}'),
+                              onTap: () {
+                                final activeCall = ref.read(activeCallProvider);
+                                final activeSession = ref.read(roomSessionProvider).value;
+                                if (activeCall != null &&
+                                    activeSession != null &&
+                                    activeSession.isInCall &&
+                                    activeSession.roomId != rooms[i].roomId) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'You are already in "${activeSession.roomName}". Leave it first.',
+                                      ),
+                                      action: SnackBarAction(
+                                        label: 'Go back',
+                                        onPressed: () {
+                                          context.push('/room/${activeSession.roomId}');
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                context.push('/room/${rooms[i].roomId}');
                               },
                             ),
                             childCount: rooms.length,

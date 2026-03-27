@@ -54,6 +54,7 @@ class GetstreamStateNotifier extends Notifier<GetstreamState> {
         role: role == UserRole.host ? 'host' : 'user',
       ),
       userToken: getstreamToken,
+      // failIfSingletonExists: false,
       // options: StreamVideoOptions(defaultCallPreferences: preferences),
     );
 
@@ -68,6 +69,22 @@ class GetstreamStateNotifier extends Notifier<GetstreamState> {
     }
 
     state = GetstreamState(isInitialized: true, userToken: resolvedToken);
+  }
+
+  /// Tears down and recreates the [StreamVideo] singleton with a fresh token.
+  Future<void> reinitialize({
+    required String userId,
+    required String userName,
+    required String getstreamToken,
+    required UserRole role,
+  }) async {
+    await dispose();
+    await init(
+      userId: userId,
+      userName: userName,
+      getstreamToken: getstreamToken,
+      role: role,
+    );
   }
 
   /// Tears down the [StreamVideo] singleton.

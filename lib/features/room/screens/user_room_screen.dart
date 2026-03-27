@@ -14,7 +14,7 @@ import '../../../core/network/websocket_service.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/constants/storage_keys.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../domain/enums/room_status.dart';
+import '../../../core/router/app_router.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class UserRoomScreen extends ConsumerStatefulWidget {
@@ -28,12 +28,14 @@ class UserRoomScreen extends ConsumerStatefulWidget {
 
 class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
   StreamSubscription? _wsSub;
-  bool _isJoining = false;
+  late final IsOnRoomScreenNotifier _roomScreenNotifier;
 
   @override
   void initState() {
     super.initState();
+    _roomScreenNotifier = ref.read(isOnRoomScreenProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _roomScreenNotifier.set(true);
       ref.read(roomSessionProvider.notifier).loadRoom(widget.roomId);
       _subscribeToForceEvents();
     });
@@ -41,6 +43,7 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
 
   @override
   void dispose() {
+    Future.microtask(() => _roomScreenNotifier.set(false));
     _wsSub?.cancel();
     super.dispose();
   }
@@ -68,12 +71,6 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
         }
       }
 
-      // When host starts the room, auto-refresh so user sees the Join button.
-      if (eventName == 'room.started' &&
-          payload['roomId'] == widget.roomId) {
-        ref.read(roomSessionProvider.notifier).refreshRoom();
-      }
-
       if (eventName == 'user.force_logout' && payload['userId'] == myId) {
         await ref.read(authStateProvider.notifier).logout();
         if (mounted) context.go('/login');
@@ -83,10 +80,6 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sessionAsync = ref.watch(roomSessionProvider);
-    final session = sessionAsync.value;
-    final roomName = session?.roomName ?? '';
-
     ref.listen(roomSessionProvider, (_, next) {
       next.whenData((session) {
         if (session.isEnded && mounted) {
@@ -99,93 +92,39 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
     });
 
     final call = ref.watch(activeCallProvider);
+    final sessionState = ref.watch(roomSessionProvider);
+    final roomName = sessionState.isLoading ? '' : (sessionState.value?.roomName ?? '');
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
-        title: Text(roomName, style: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w600)),
+        title: Text(
+          roomName.isEmpty ? '' : roomName,
+          style: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w600),
+        ),
         centerTitle: true,
-        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textSecondary),
+          onPressed: () => context.go('/home'),
+        ),
       ),
       body: SafeArea(
         bottom: false,
-        child: _buildBody(sessionAsync, call),
-      ),
-    );
-  }
-
-  Widget _buildBody(AsyncValue<RoomSession> sessionAsync, Call? call) {
-    // Loading state
-    if (sessionAsync.isLoading && sessionAsync.value == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    // Error state
-    if (sessionAsync.hasError && sessionAsync.value == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: AppColors.error),
-              const SizedBox(height: 16),
-              Text(
-                sessionAsync.error.toString(),
-                style: const TextStyle(color: AppColors.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              OutlinedButton(
-                onPressed: () => ref.read(roomSessionProvider.notifier).loadRoom(widget.roomId),
-                child: const Text('Retry'),
-              ),
+        child: Column(
+          children: [
+            if (call == null)
+              const Expanded(
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else ...[
+              // Participants area
+              Expanded(child: ParticipantsGrid(call: call)),
+              _buildControls(call),
             ],
-          ),
+          ],
         ),
-      );
-    }
-
-    final session = sessionAsync.value;
-    if (session == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    // Already in the call — show participants + controls
-    if (session.isInCall && call != null) {
-      return Column(
-        children: [
-          Expanded(child: ParticipantsGrid(call: call)),
-          _buildControls(call),
-        ],
-      );
-    }
-
-    // Room is live but user hasn't joined yet — show Join button
-    if (session.status == RoomStatus.live) {
-      return _JoinView(
-        isJoining: _isJoining,
-        onJoin: () async {
-          setState(() => _isJoining = true);
-          try {
-            await ref.read(roomSessionProvider.notifier).joinRoomAndEnter();
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Failed to join: $e')),
-              );
-            }
-          } finally {
-            if (mounted) setState(() => _isJoining = false);
-          }
-        },
-      );
-    }
-
-    // Room not live yet — waiting for host to start
-    return _WaitingView(
-      onRefresh: () => ref.read(roomSessionProvider.notifier).refreshRoom(),
+      ),
     );
   }
 
@@ -208,10 +147,9 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
 }
 
 class _JoinView extends StatelessWidget {
-  final bool isJoining;
   final VoidCallback onJoin;
 
-  const _JoinView({required this.isJoining, required this.onJoin});
+  const _JoinView({required this.onJoin});
 
   @override
   Widget build(BuildContext context) {
@@ -249,18 +187,9 @@ class _JoinView extends StatelessWidget {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              icon: isJoining
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.headset_rounded),
-              label: Text(
-                isJoining ? 'Joining...' : 'Join Room',
-                style: const TextStyle(fontSize: 16),
-              ),
-              onPressed: isJoining ? null : onJoin,
+              icon: const Icon(Icons.headset_rounded),
+              label: const Text('Join Room', style: TextStyle(fontSize: 16)),
+              onPressed: onJoin,
             ),
           ),
         ],

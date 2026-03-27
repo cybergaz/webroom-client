@@ -6,6 +6,11 @@ class AuthInterceptor extends QueuedInterceptorsWrapper {
   final Dio _dio;
   final SecureStorageService _storage;
 
+  /// When true, the refresh token is dead and the user must re-login.
+  /// The UI layer (e.g. auth provider) should check this.
+  bool _refreshTokenDead = false;
+  bool get isRefreshTokenDead => _refreshTokenDead;
+
   AuthInterceptor(this._dio, this._storage);
 
   @override
@@ -16,7 +21,7 @@ class AuthInterceptor extends QueuedInterceptorsWrapper {
     var token = await _storage.read(StorageKeys.accessToken);
 
     // Access token missing — try refreshing proactively before sending
-    if (token == null) {
+    if (token == null && !_refreshTokenDead) {
       token = await _tryRefresh();
     }
 
@@ -28,16 +33,26 @@ class AuthInterceptor extends QueuedInterceptorsWrapper {
 
   /// Attempts a token refresh. Returns the new access token, or null on failure.
   Future<String?> _tryRefresh() async {
-    try {
-      final refreshToken = await _storage.read(StorageKeys.refreshToken);
-      if (refreshToken == null) return null;
+    if (_refreshTokenDead) return null;
 
-      final refreshDio = Dio(BaseOptions(
-        baseUrl: _dio.options.baseUrl,
-        connectTimeout: _dio.options.connectTimeout,
-        receiveTimeout: _dio.options.receiveTimeout,
-        headers: {'Content-Type': 'application/json'},
-      ));
+    final refreshToken = await _storage.read(StorageKeys.refreshToken);
+    if (refreshToken == null) {
+      print('Token refresh skipped: no refresh token in storage');
+      _refreshTokenDead = true;
+      await _storage.deleteAll();
+      return null;
+    }
+
+    print('Attempting token refresh...');
+    try {
+      final refreshDio = Dio(
+        BaseOptions(
+          baseUrl: _dio.options.baseUrl,
+          connectTimeout: _dio.options.connectTimeout,
+          receiveTimeout: _dio.options.receiveTimeout,
+          headers: {'Content-Type': 'application/json'},
+        ),
+      );
       final response = await refreshDio.post(
         '/auth/refresh',
         data: {'refreshToken': refreshToken},
@@ -45,10 +60,26 @@ class AuthInterceptor extends QueuedInterceptorsWrapper {
 
       final newAccessToken = response.data['accessToken'] as String;
       final newRefreshToken = response.data['refreshToken'] as String;
+      final newGetstreamToken = response.data['getstreamToken'] as String?;
       await _storage.write(StorageKeys.accessToken, newAccessToken);
       await _storage.write(StorageKeys.refreshToken, newRefreshToken);
+      if (newGetstreamToken != null) {
+        await _storage.write(StorageKeys.getstreamToken, newGetstreamToken);
+      }
+      print('Token refresh succeeded');
       return newAccessToken;
-    } catch (_) {
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 403) {
+        // Refresh token is permanently invalid — force logout.
+        print('Refresh token rejected (403) — clearing storage for re-login');
+        _refreshTokenDead = true;
+        await _storage.deleteAll();
+      } else {
+        print('Token refresh failed: ${e.response?.statusCode} ${e.message}');
+      }
+      return null;
+    } catch (e) {
+      print('Token refresh failed: $e');
       return null;
     }
   }
@@ -58,7 +89,7 @@ class AuthInterceptor extends QueuedInterceptorsWrapper {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
-    if (err.response?.statusCode == 401) {
+    if (err.response?.statusCode == 401 && !_refreshTokenDead) {
       final newToken = await _tryRefresh();
       if (newToken != null) {
         // Retry the original request with the fresh token
@@ -70,11 +101,7 @@ class AuthInterceptor extends QueuedInterceptorsWrapper {
           return;
         } catch (_) {}
       }
-      // Refresh failed — clear storage so the app redirects to login
-      await _storage.deleteAll();
-      handler.next(err);
-    } else {
-      handler.next(err);
     }
+    handler.next(err);
   }
 }

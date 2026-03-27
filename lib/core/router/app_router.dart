@@ -130,3 +130,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+/// Tracks whether the user is currently on a room screen.
+/// Room screens set this to true on init and false on dispose.
+class IsOnRoomScreenNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool value) => state = value;
+}
+
+final isOnRoomScreenProvider = NotifierProvider<IsOnRoomScreenNotifier, bool>(
+  IsOnRoomScreenNotifier.new,
+);

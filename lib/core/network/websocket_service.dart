@@ -100,7 +100,7 @@ class WebSocketService {
     try {
       final refreshToken = await _storage.read(StorageKeys.refreshToken);
       if (refreshToken == null) {
-        await _storage.deleteAll();
+        print('WS: no refresh token available, skipping reconnect');
         return;
       }
 
