@@ -14,6 +14,7 @@ import '../../../core/network/websocket_service.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/constants/storage_keys.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../domain/enums/room_status.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class UserRoomScreen extends ConsumerStatefulWidget {
@@ -27,6 +28,7 @@ class UserRoomScreen extends ConsumerStatefulWidget {
 
 class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
   StreamSubscription? _wsSub;
+  bool _isJoining = false;
 
   @override
   void initState() {
@@ -66,6 +68,12 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
         }
       }
 
+      // When host starts the room, auto-refresh so user sees the Join button.
+      if (eventName == 'room.started' &&
+          payload['roomId'] == widget.roomId) {
+        ref.read(roomSessionProvider.notifier).refreshRoom();
+      }
+
       if (eventName == 'user.force_logout' && payload['userId'] == myId) {
         await ref.read(authStateProvider.notifier).logout();
         if (mounted) context.go('/login');
@@ -75,6 +83,10 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final sessionAsync = ref.watch(roomSessionProvider);
+    final session = sessionAsync.value;
+    final roomName = session?.roomName ?? '';
+
     ref.listen(roomSessionProvider, (_, next) {
       next.whenData((session) {
         if (session.isEnded && mounted) {
@@ -87,7 +99,6 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
     });
 
     final call = ref.watch(activeCallProvider);
-    final roomName = ref.watch(roomSessionProvider).value?.roomName ?? '';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -99,39 +110,108 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
       ),
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            if (call == null)
-              const Expanded(
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else ...[
-              // Participants area
-              Expanded(child: ParticipantsGrid(call: call)),
-              // Custom controls (no Members button for regular users)
-              CallControlsBar(
-                call: call,
-                isHost: false,
-                onEndOrLeave: () async {
-                  await ref
-                      .read(pttStateProvider.notifier)
-                      .stopTransmitting();
-                  await ref.read(roomSessionProvider.notifier).leaveRoom();
-                  if (context.mounted) context.go('/home');
-                },
+        child: _buildBody(sessionAsync, call),
+      ),
+    );
+  }
+
+  Widget _buildBody(AsyncValue<RoomSession> sessionAsync, Call? call) {
+    // Loading state
+    if (sessionAsync.isLoading && sessionAsync.value == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Error state
+    if (sessionAsync.hasError && sessionAsync.value == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+              const SizedBox(height: 16),
+              Text(
+                sessionAsync.error.toString(),
+                style: const TextStyle(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              OutlinedButton(
+                onPressed: () => ref.read(roomSessionProvider.notifier).loadRoom(widget.roomId),
+                child: const Text('Retry'),
               ),
             ],
-          ],
+          ),
         ),
-      ),
+      );
+    }
+
+    final session = sessionAsync.value;
+    if (session == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Already in the call — show participants + controls
+    if (session.isInCall && call != null) {
+      return Column(
+        children: [
+          Expanded(child: ParticipantsGrid(call: call)),
+          _buildControls(call),
+        ],
+      );
+    }
+
+    // Room is live but user hasn't joined yet — show Join button
+    if (session.status == RoomStatus.live) {
+      return _JoinView(
+        isJoining: _isJoining,
+        onJoin: () async {
+          setState(() => _isJoining = true);
+          try {
+            await ref.read(roomSessionProvider.notifier).joinRoomAndEnter();
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to join: $e')),
+              );
+            }
+          } finally {
+            if (mounted) setState(() => _isJoining = false);
+          }
+        },
+      );
+    }
+
+    // Room not live yet — waiting for host to start
+    return _WaitingView(
+      onRefresh: () => ref.read(roomSessionProvider.notifier).refreshRoom(),
+    );
+  }
+
+  Widget _buildControls(Call call) {
+    final ptt = ref.watch(pttStateProvider);
+    return CallControlsBar(
+      call: call,
+      isHost: false,
+      isTransmitting: ptt.isTransmitting,
+      audioLevel: ptt.audioLevel,
+      onPttDown: () => ref.read(pttStateProvider.notifier).startTransmitting(),
+      onPttUp: () => ref.read(pttStateProvider.notifier).stopTransmitting(),
+      onEndOrLeave: () async {
+        await ref.read(pttStateProvider.notifier).stopTransmitting();
+        await ref.read(roomSessionProvider.notifier).leaveRoom();
+        if (context.mounted) context.go('/home');
+      },
     );
   }
 }
 
 class _JoinView extends StatelessWidget {
+  final bool isJoining;
   final VoidCallback onJoin;
 
-  const _JoinView({required this.onJoin});
+  const _JoinView({required this.isJoining, required this.onJoin});
 
   @override
   Widget build(BuildContext context) {
@@ -169,9 +249,18 @@ class _JoinView extends StatelessWidget {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              icon: const Icon(Icons.headset_rounded),
-              label: const Text('Join Room', style: TextStyle(fontSize: 16)),
-              onPressed: onJoin,
+              icon: isJoining
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.headset_rounded),
+              label: Text(
+                isJoining ? 'Joining...' : 'Join Room',
+                style: const TextStyle(fontSize: 16),
+              ),
+              onPressed: isJoining ? null : onJoin,
             ),
           ),
         ],

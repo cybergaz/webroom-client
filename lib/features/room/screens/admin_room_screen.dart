@@ -31,7 +31,9 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final roomName = ref.watch(roomSessionProvider).value?.roomName ?? '';
+    final sessionAsync = ref.watch(roomSessionProvider);
+    final session = sessionAsync.value;
+    final roomName = session?.roomName ?? '';
 
     ref.listen(roomSessionProvider, (_, next) {
       next.whenData((session) {
@@ -50,48 +52,111 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
         title: Text(roomName, style: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w600)),
         centerTitle: true,
         automaticallyImplyLeading: false,
+        actions: [
+          if (call != null)
+            IconButton(
+              icon: const Icon(Icons.people_rounded, color: AppColors.textSecondary),
+              tooltip: 'Members',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CallParticipantsScreen(call: call),
+                  ),
+                );
+              },
+            ),
+        ],
       ),
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            if (call == null)
-              const Expanded(child: Center(child: CircularProgressIndicator()))
-            else ...[
-              // Participants area
-              Expanded(child: ParticipantsGrid(call: call)),
-              // Custom controls
-              CallControlsBar(
-                call: call,
-                isHost: true,
-                onParticipantsTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => CallParticipantsScreen(call: call),
-                    ),
-                  );
-                },
-                onEndOrLeave: () async {
-                  await ref.read(pttStateProvider.notifier).stopTransmitting();
-                  await ref.read(roomSessionProvider.notifier).endRoom();
-                  if (context.mounted) context.go('/home');
-                },
+        child: _buildBody(sessionAsync, call),
+      ),
+    );
+  }
+
+  Widget _buildBody(AsyncValue<RoomSession> sessionAsync, Call? call) {
+    // Loading state
+    if (sessionAsync.isLoading && sessionAsync.value == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Error state
+    if (sessionAsync.hasError && sessionAsync.value == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+              const SizedBox(height: 16),
+              Text(
+                sessionAsync.error.toString(),
+                style: const TextStyle(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              OutlinedButton(
+                onPressed: () => ref.read(roomSessionProvider.notifier).loadRoom(widget.roomId),
+                child: const Text('Retry'),
               ),
             ],
-          ],
+          ),
         ),
-      ),
+      );
+    }
+
+    final session = sessionAsync.value;
+    if (session == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // In call — show participants grid + controls
+    if (session.isInCall && call != null) {
+      return Column(
+        children: [
+          Expanded(child: ParticipantsGrid(call: call)),
+          _buildControls(call),
+        ],
+      );
+    }
+
+    // Room not started yet — show pre-call host view with Start button
+    return _PreCallHostView(roomId: widget.roomId);
+  }
+
+  Widget _buildControls(Call call) {
+    final ptt = ref.watch(pttStateProvider);
+    return CallControlsBar(
+      call: call,
+      isHost: true,
+      isTransmitting: ptt.isTransmitting,
+      audioLevel: ptt.audioLevel,
+      onPttDown: () => ref.read(pttStateProvider.notifier).startTransmitting(),
+      onPttUp: () => ref.read(pttStateProvider.notifier).stopTransmitting(),
+      onEndOrLeave: () async {
+        await ref.read(pttStateProvider.notifier).stopTransmitting();
+        await ref.read(roomSessionProvider.notifier).endRoom();
+        if (context.mounted) context.go('/home');
+      },
     );
   }
 }
 
-class _PreCallHostView extends ConsumerWidget {
+class _PreCallHostView extends ConsumerStatefulWidget {
   final String roomId;
 
   const _PreCallHostView({required this.roomId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_PreCallHostView> createState() => _PreCallHostViewState();
+}
+
+class _PreCallHostViewState extends ConsumerState<_PreCallHostView> {
+  bool _isStarting = false;
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -126,10 +191,33 @@ class _PreCallHostView extends ConsumerWidget {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text('Start Room', style: TextStyle(fontSize: 16)),
-              onPressed: () =>
-                  ref.read(roomSessionProvider.notifier).startRoomAndEnter(),
+              icon: _isStarting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.play_arrow_rounded),
+              label: Text(
+                _isStarting ? 'Starting...' : 'Start Room',
+                style: const TextStyle(fontSize: 16),
+              ),
+              onPressed: _isStarting
+                  ? null
+                  : () async {
+                      setState(() => _isStarting = true);
+                      try {
+                        await ref.read(roomSessionProvider.notifier).startRoomAndEnter();
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to start room: $e')),
+                          );
+                        }
+                      } finally {
+                        if (mounted) setState(() => _isStarting = false);
+                      }
+                    },
             ),
           ),
           const SizedBox(height: 12),
@@ -143,39 +231,41 @@ class _PreCallHostView extends ConsumerWidget {
               ),
               icon: const Icon(Icons.delete_outline_rounded),
               label: const Text('Delete Room', style: TextStyle(fontSize: 16)),
-              onPressed: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: AppColors.surface,
-                    title: const Text(
-                      'Delete Room',
-                      style: TextStyle(color: AppColors.textPrimary),
-                    ),
-                    content: const Text(
-                      'This will permanently delete the room.',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text(
-                          'Delete',
-                          style: TextStyle(color: AppColors.error),
+              onPressed: _isStarting
+                  ? null
+                  : () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          backgroundColor: AppColors.surface,
+                          title: const Text(
+                            'Delete Room',
+                            style: TextStyle(color: AppColors.textPrimary),
+                          ),
+                          content: const Text(
+                            'This will permanently delete the room.',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text(
+                                'Delete',
+                                style: TextStyle(color: AppColors.error),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirmed == true && context.mounted) {
-                  await ref.read(roomSessionProvider.notifier).deleteRoom();
-                  if (context.mounted) context.go('/home');
-                }
-              },
+                      );
+                      if (confirmed == true && context.mounted) {
+                        await ref.read(roomSessionProvider.notifier).deleteRoom();
+                        if (context.mounted) context.go('/home');
+                      }
+                    },
             ),
           ),
         ],
