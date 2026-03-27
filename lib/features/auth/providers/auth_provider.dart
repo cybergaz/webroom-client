@@ -106,13 +106,13 @@ class AuthNotifier extends Notifier<AuthState> {
     return requestId;
   }
 
-  Future<void> login({required String phone, required String password}) async {
+  Future<void> login({String? phone, String? email, required String password}) async {
     state = const AuthState.loading();
     final repo = AuthRepositoryImpl(
       AuthRemoteDatasource(ref.read(dioClientProvider)),
       ref.read(secureStorageProvider),
     );
-    final result = await repo.login(phone: phone, password: password);
+    final result = await repo.login(phone: phone, email: email, password: password);
 
     // Persist user name for StreamVideo re-init on next app launch
     await ref

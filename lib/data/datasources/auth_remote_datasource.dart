@@ -26,11 +26,13 @@ class AuthRemoteDatasource {
   }
 
   Future<Map<String, dynamic>> login({
-    required String phone,
+    String? phone,
+    String? email,
     required String password,
   }) async {
     final response = await _dio.post('/auth/login', data: {
-      'phone': phone,
+      if (phone != null && phone.isNotEmpty) 'phone': phone,
+      if (email != null && email.isNotEmpty) 'email': email,
       'password': password,
     });
     return response.data as Map<String, dynamic>;

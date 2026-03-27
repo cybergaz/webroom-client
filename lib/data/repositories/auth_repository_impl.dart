@@ -24,10 +24,11 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<({UserModel user, String accessToken, String refreshToken, String getstreamToken})> login({
-    required String phone,
+    String? phone,
+    String? email,
     required String password,
   }) async {
-    final data = await _datasource.login(phone: phone, password: password);
+    final data = await _datasource.login(phone: phone, email: email, password: password);
     final user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
     final accessToken = data['accessToken'] as String;
     final refreshToken = data['refreshToken'] as String;

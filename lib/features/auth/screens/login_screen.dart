@@ -10,6 +10,8 @@ import '../../../core/utils/validators.dart';
 import '../../../core/utils/error_mapper.dart';
 import '../../../domain/enums/user_role.dart';
 
+enum _LoginMethod { phone, email }
+
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -18,7 +20,9 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  _LoginMethod _loginMethod = _LoginMethod.phone;
   String _phone = '';
+  String _email = '';
   String _password = '';
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -32,9 +36,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _error = null;
     });
     try {
-      await ref
-          .read(authStateProvider.notifier)
-          .login(phone: _phone, password: _password);
+      await ref.read(authStateProvider.notifier).login(
+        phone: _loginMethod == _LoginMethod.phone ? _phone : null,
+        email: _loginMethod == _LoginMethod.email ? _email : null,
+        password: _password,
+      );
       if (!mounted) return;
       final authState = ref.read(authStateProvider);
       if (authState case AuthStateAuthenticated(:final user)) {
@@ -100,11 +106,63 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   'Sign in to your account',
                   style: TextStyle(color: AppColors.textSecondary),
                 ).animate().fadeIn(delay: 160.ms, duration: 300.ms),
-                const SizedBox(height: 32),
-                PhoneInputField(
-                  onChanged: (v) => _phone = v,
-                  validator: Validators.phone,
-                ).animate().fadeIn(delay: 240.ms, duration: 300.ms),
+                const SizedBox(height: 24),
+                SegmentedButton<_LoginMethod>(
+                  segments: const [
+                    ButtonSegment(
+                      value: _LoginMethod.phone,
+                      label: Text('Phone'),
+                      icon: Icon(Icons.phone_outlined),
+                    ),
+                    ButtonSegment(
+                      value: _LoginMethod.email,
+                      label: Text('Email'),
+                      icon: Icon(Icons.email_outlined),
+                    ),
+                  ],
+                  selected: {_loginMethod},
+                  onSelectionChanged: (selection) {
+                    setState(() {
+                      _loginMethod = selection.first;
+                      _error = null;
+                      _formKey.currentState?.reset();
+                    });
+                  },
+                  style: ButtonStyle(
+                    backgroundColor: WidgetStateProperty.resolveWith((states) {
+                      if (states.contains(WidgetState.selected)) {
+                        return AppColors.accent;
+                      }
+                      return AppColors.surface;
+                    }),
+                    foregroundColor: WidgetStateProperty.resolveWith((states) {
+                      if (states.contains(WidgetState.selected)) {
+                        return Colors.white;
+                      }
+                      return AppColors.textSecondary;
+                    }),
+                  ),
+                ).animate().fadeIn(delay: 200.ms, duration: 300.ms),
+                const SizedBox(height: 24),
+                if (_loginMethod == _LoginMethod.phone)
+                  PhoneInputField(
+                    onChanged: (v) => _phone = v,
+                    validator: Validators.phone,
+                  ).animate().fadeIn(duration: 200.ms)
+                else
+                  TextFormField(
+                    style: const TextStyle(color: AppColors.textPrimary),
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: Icon(Icons.email_outlined, color: AppColors.textSecondary),
+                    ),
+                    onChanged: (v) => _email = v,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Email is required';
+                      return Validators.email(v);
+                    },
+                  ).animate().fadeIn(duration: 200.ms),
                 const SizedBox(height: 16),
                 TextFormField(
                   style: const TextStyle(color: AppColors.textPrimary),
