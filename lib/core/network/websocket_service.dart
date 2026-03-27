@@ -83,11 +83,11 @@ class WebSocketService {
     _channel?.sink.add(jsonEncode({'event': event, 'payload': payload ?? {}}));
   }
 
-  /// Sends a speaking event in the fire-and-forget format required by the server.
-  /// [type] is either 'speaking.start' or 'speaking.end'.
-  void sendSpeakingEvent(String type) {
+  /// Sends a speaking event in the format required by the server.
+  /// [event] is either 'speaking.start' or 'speaking.end'.
+  void sendSpeakingEvent(String event, String roomId) {
     if (_currentState != WsConnectionState.connected) return;
-    _channel?.sink.add(jsonEncode({'type': type}));
+    _channel?.sink.add(jsonEncode({'event': event, 'payload': {'roomId': roomId}}));
   }
 
   Future<void> _refreshTokenAndReconnect() async {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../core/network/websocket_service.dart';
 import 'getstream_provider.dart';
+import 'room_session_provider.dart';
 
 part 'ptt_provider.freezed.dart';
 
@@ -29,7 +30,8 @@ class PttNotifier extends Notifier<PttState> {
 
     state = state.copyWith(isTransmitting: true);
     await call.setMicrophoneEnabled(enabled: true);
-    ref.read(websocketServiceProvider).sendSpeakingEvent('speaking.start');
+    final roomId = ref.read(roomSessionProvider).value?.roomId ?? '';
+    ref.read(websocketServiceProvider).sendSpeakingEvent('speaking.start', roomId);
 
     _audioLevelSub?.cancel();
     _audioLevelSub = call.state.valueStream.map((s) {
@@ -48,7 +50,8 @@ class PttNotifier extends Notifier<PttState> {
     _audioLevelSub?.cancel();
     _audioLevelSub = null;
     state = state.copyWith(isTransmitting: false, audioLevel: 0.0);
-    ref.read(websocketServiceProvider).sendSpeakingEvent('speaking.end');
+    final roomId = ref.read(roomSessionProvider).value?.roomId ?? '';
+    ref.read(websocketServiceProvider).sendSpeakingEvent('speaking.end', roomId);
 
     if (call == null) return;
     await call.setMicrophoneEnabled(enabled: false);
