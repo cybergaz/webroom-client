@@ -33,18 +33,20 @@ class GetstreamStateNotifier extends Notifier<GetstreamState> {
     required String getstreamToken,
     required UserRole role,
   }) async {
-    if (StreamVideo.isInitialized()) {
-      if (!state.isInitialized) {
-        state = GetstreamState(isInitialized: true, userToken: getstreamToken);
-      }
+    // If we consider the singleton valid, reuse it.
+    if (state.isInitialized && StreamVideo.isInitialized()) {
       return;
     }
 
-    // final preferences = DefaultCallPreferences(
-    //   reconnectTimeout: const Duration(minutes: 2),
-    //   networkAvailabilityTimeout: const Duration(minutes: 3),
-    //   connectTimeout: const Duration(seconds: 30),
-    // );
+    // A stale singleton can survive dispose() in some SDK versions.
+    // Force-clean it before creating a fresh instance.
+    if (StreamVideo.isInitialized()) {
+      print('Stale StreamVideo singleton detected — force-disposing');
+      try {
+        await StreamVideo.instance.disconnect();
+        await StreamVideo.instance.dispose();
+      } catch (_) {}
+    }
 
     final client = StreamVideo(
       AppConstants.getstreamApiKey,
@@ -54,8 +56,7 @@ class GetstreamStateNotifier extends Notifier<GetstreamState> {
         role: role == UserRole.host ? 'host' : 'user',
       ),
       userToken: getstreamToken,
-      // failIfSingletonExists: false,
-      // options: StreamVideoOptions(defaultCallPreferences: preferences),
+      failIfSingletonExists: false,
     );
 
     final result = await client.connect();
@@ -66,6 +67,9 @@ class GetstreamStateNotifier extends Notifier<GetstreamState> {
       if (returned != null && returned.rawValue.isNotEmpty) {
         resolvedToken = returned.rawValue;
       }
+      print('StreamVideo connected successfully');
+    } else {
+      print('StreamVideo connect returned failure: $result');
     }
 
     state = GetstreamState(isInitialized: true, userToken: resolvedToken);

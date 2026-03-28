@@ -6,9 +6,12 @@ import 'package:go_router/go_router.dart';
 import 'package:stream_video/stream_video.dart';
 
 import '../providers/getstream_provider.dart';
+import '../providers/odds_provider.dart';
 import '../providers/room_session_provider.dart';
 import '../providers/ptt_provider.dart';
 import '../widgets/call_controls_bar.dart';
+import '../widgets/market_odds_box.dart';
+import '../widgets/odds_selection_dialog.dart';
 import '../widgets/participants_grid.dart';
 import '../../../core/network/websocket_service.dart';
 import '../../../core/storage/secure_storage.dart';
@@ -29,6 +32,7 @@ class UserRoomScreen extends ConsumerStatefulWidget {
 class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
   StreamSubscription? _wsSub;
   late final IsOnRoomScreenNotifier _roomScreenNotifier;
+  late final OddsNotifier _oddsNotifier;
   Timer? _graceCountdownTimer;
   int _graceSecondsRemaining = 0;
 
@@ -36,6 +40,7 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
   void initState() {
     super.initState();
     _roomScreenNotifier = ref.read(isOnRoomScreenProvider.notifier);
+    _oddsNotifier = ref.read(oddsProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _roomScreenNotifier.set(true);
       ref.read(roomSessionProvider.notifier).loadRoom(widget.roomId);
@@ -45,7 +50,10 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
 
   @override
   void dispose() {
-    Future.microtask(() => _roomScreenNotifier.set(false));
+    Future.microtask(() {
+      _roomScreenNotifier.set(false);
+      _oddsNotifier.stopPolling();
+    });
     _graceCountdownTimer?.cancel();
     _wsSub?.cancel();
     super.dispose();
@@ -103,21 +111,32 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen(roomSessionProvider, (prev, next) {
-      next.whenData((session) {
-        if (session.isEnded && mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Room ended by host')));
-          context.go('/home');
-        }
+      next.when(
+        data: (session) {
+          if (session.isEnded && mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Room ended by host')));
+            context.go('/home');
+          }
 
-        final wasDisconnected = prev?.value?.isHostDisconnected ?? false;
-        if (session.isHostDisconnected && !wasDisconnected) {
-          _startGraceCountdown(session.hostGraceSeconds);
-        } else if (!session.isHostDisconnected && wasDisconnected) {
-          _stopGraceCountdown();
-        }
-      });
+          final wasDisconnected = prev?.value?.isHostDisconnected ?? false;
+          if (session.isHostDisconnected && !wasDisconnected) {
+            _startGraceCountdown(session.hostGraceSeconds);
+          } else if (!session.isHostDisconnected && wasDisconnected) {
+            _stopGraceCountdown();
+          }
+        },
+        error: (e, _) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to join room. Please try again.')),
+            );
+            context.go('/home');
+          }
+        },
+        loading: () {},
+      );
     });
 
     final call = ref.watch(activeCallProvider);
@@ -146,6 +165,16 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
           ),
           onPressed: () => context.go('/home'),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.show_chart_rounded, color: AppColors.textSecondary),
+            tooltip: 'Market Odds',
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => const OddsSelectionDialog(),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         bottom: false,
@@ -174,6 +203,7 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
                   ],
                 ),
               ),
+            const MarketOddsBox(),
             if (call == null)
               const Expanded(child: Center(child: CircularProgressIndicator()))
             else ...[

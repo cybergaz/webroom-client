@@ -4,8 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:stream_video/stream_video.dart';
 
 import '../providers/getstream_provider.dart';
+import '../providers/odds_provider.dart';
 import '../providers/room_session_provider.dart';
 import '../widgets/call_controls_bar.dart';
+import '../widgets/market_odds_box.dart';
+import '../widgets/odds_selection_dialog.dart';
 import '../widgets/participants_grid.dart';
 import 'call_participants_screen.dart';
 import '../../../core/theme/app_colors.dart';
@@ -22,11 +25,13 @@ class AdminRoomScreen extends ConsumerStatefulWidget {
 
 class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
   late final IsOnRoomScreenNotifier _roomScreenNotifier;
+  late final OddsNotifier _oddsNotifier;
 
   @override
   void initState() {
     super.initState();
     _roomScreenNotifier = ref.read(isOnRoomScreenProvider.notifier);
+    _oddsNotifier = ref.read(oddsProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _roomScreenNotifier.set(true);
       ref.read(roomSessionProvider.notifier).loadRoom(widget.roomId);
@@ -35,7 +40,10 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
 
   @override
   void dispose() {
-    Future.microtask(() => _roomScreenNotifier.set(false));
+    Future.microtask(() {
+      _roomScreenNotifier.set(false);
+      _oddsNotifier.stopPolling();
+    });
     super.dispose();
   }
 
@@ -45,11 +53,22 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
     final roomName = sessionState.isLoading ? '' : (sessionState.value?.roomName ?? '');
 
     ref.listen(roomSessionProvider, (_, next) {
-      next.whenData((session) {
-        if (session.isEnded && mounted) {
-          context.go('/home');
-        }
-      });
+      next.when(
+        data: (session) {
+          if (session.isEnded && mounted) {
+            context.go('/home');
+          }
+        },
+        error: (e, _) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to join room. Please try again.')),
+            );
+            context.go('/home');
+          }
+        },
+        loading: () {},
+      );
     });
 
     final call = ref.watch(activeCallProvider);
@@ -68,6 +87,14 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
           onPressed: () => context.go('/home'),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.show_chart_rounded, color: AppColors.textSecondary),
+            tooltip: 'Market Odds',
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => const OddsSelectionDialog(),
+            ),
+          ),
           if (call != null)
             IconButton(
               icon: const Icon(Icons.people_rounded, color: AppColors.textSecondary),
@@ -86,6 +113,7 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
         bottom: false,
         child: Column(
           children: [
+            const MarketOddsBox(),
             if (call == null)
               const Expanded(child: Center(child: CircularProgressIndicator()))
             else ...[

@@ -38,8 +38,8 @@ class AuthInterceptor extends QueuedInterceptorsWrapper {
     final refreshToken = await _storage.read(StorageKeys.refreshToken);
     if (refreshToken == null) {
       print('Token refresh skipped: no refresh token in storage');
-      _refreshTokenDead = true;
-      await _storage.deleteAll();
+      // Don't set _refreshTokenDead here — a fresh login will provide new tokens.
+      // Only mark dead on explicit 403 rejection from the refresh endpoint.
       return null;
     }
 

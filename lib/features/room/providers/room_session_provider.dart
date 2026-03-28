@@ -282,8 +282,9 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
           );
     }
 
-    // Health-check: queryCalls will throw (TimeoutException) if the
-    // coordinator WS is stale — letting the outer _enterCall catch & retry.
+    // Health-check: queryCalls will fail if the coordinator WS is stale.
+    // Throw on failure so the outer _enterCall can catch & retry with a
+    // fresh GetStream connection.
     final call_stat = await StreamVideo.instance.queryCalls(
       filterConditions: {'id': getstreamCallId},
     );
@@ -291,6 +292,12 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
     print("-----------------------------------------------------------");
     print("if any old call stat : ${call_stat.toString()}");
     print("-----------------------------------------------------------");
+
+    if (!call_stat.isSuccess) {
+      throw Exception(
+        'GetStream coordinator not connected: $call_stat',
+      );
+    }
 
     final call = StreamVideo.instance.makeCall(
       callType: StreamCallType.audioRoom(),
@@ -323,7 +330,9 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
     final connectOptions = CallConnectOptions(
       microphone: TrackOption.enabled(),
     );
-    await call.join(connectOptions: connectOptions);
+    await call.join(connectOptions: connectOptions).timeout(
+      const Duration(seconds: 15),
+    );
 
     print("entercall: chk 5");
     print("-----------------------------------------------------------");
