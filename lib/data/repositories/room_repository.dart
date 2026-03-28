@@ -16,6 +16,7 @@ abstract class RoomRepository {
   getRoom(String roomId);
   Future<Map<String, dynamic>> joinRoom(String roomId);
   Future<Map<String, dynamic>> startRoom(String roomId);
+  Future<void> hostReady(String roomId);
   Future<void> leaveRoom(String roomId);
   Future<void> deleteRoom(String roomId);
   Future<void> muteMember(String roomId, String userId, bool muted);

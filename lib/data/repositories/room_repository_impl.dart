@@ -70,6 +70,11 @@ class RoomRepositoryImpl implements RoomRepository {
   }
 
   @override
+  Future<void> hostReady(String roomId) async {
+    await _datasource.hostReady(roomId);
+  }
+
+  @override
   Future<void> leaveRoom(String roomId) async {
     await _datasource.leaveRoom(roomId);
   }

@@ -5,25 +5,34 @@ import 'package:stream_video/stream_video.dart';
 
 import '../../../core/theme/app_colors.dart';
 
-/// Call controls bar with PTT button at center, speaker picker, and end/leave.
+/// Call controls bar with PTT button (user) or mute toggle (host) at center,
+/// speaker picker, and end/leave.
 class CallControlsBar extends StatefulWidget {
   final Call call;
   final bool isHost;
   final VoidCallback onEndOrLeave;
-  final VoidCallback onPttDown;
-  final VoidCallback onPttUp;
+
+  // PTT callbacks (used by normal users)
+  final VoidCallback? onPttDown;
+  final VoidCallback? onPttUp;
   final bool isTransmitting;
   final double audioLevel;
+
+  // Mute toggle (used by host)
+  final VoidCallback? onMuteToggle;
+  final bool isMuted;
 
   const CallControlsBar({
     super.key,
     required this.call,
     required this.isHost,
     required this.onEndOrLeave,
-    required this.onPttDown,
-    required this.onPttUp,
+    this.onPttDown,
+    this.onPttUp,
     this.isTransmitting = false,
     this.audioLevel = 0.0,
+    this.onMuteToggle,
+    this.isMuted = true,
   });
 
   @override
@@ -81,13 +90,21 @@ class _CallControlsBarState extends State<CallControlsBar> {
                   onTap: () => _showAudioOutputPicker(context),
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 0),
-                  child: _PttButton(
-                    isTransmitting: widget.isTransmitting,
-                    audioLevel: widget.audioLevel,
-                    onPttDown: widget.onPttDown,
-                    onPttUp: widget.onPttUp,
+                  // when host, add more spacing around the mute toggle for better tap target
+                  padding: EdgeInsets.symmetric(
+                    vertical: widget.isHost ? 20 : 0,
                   ),
+                  child: widget.isHost
+                      ? _MuteToggleButton(
+                          isMuted: widget.isMuted,
+                          onTap: widget.onMuteToggle,
+                        )
+                      : _PttButton(
+                          isTransmitting: widget.isTransmitting,
+                          audioLevel: widget.audioLevel,
+                          onPttDown: widget.onPttDown ?? () {},
+                          onPttUp: widget.onPttUp ?? () {},
+                        ),
                 ),
                 _ControlButton(
                   icon: Icons.call_end_rounded,
@@ -260,12 +277,12 @@ class _PttButtonState extends State<_PttButton> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  void _onDown(TapDownDetails _) {
+  void _onDown() {
     HapticFeedback.mediumImpact();
     widget.onPttDown();
   }
 
-  void _onUp([TapUpDetails? _]) {
+  void _onUp() {
     HapticFeedback.lightImpact();
     widget.onPttUp();
   }
@@ -294,11 +311,10 @@ class _PttButtonState extends State<_PttButton> with TickerProviderStateMixin {
                   duration: const Duration(milliseconds: 80),
                   width: baseSize + levelRing,
                   height: baseSize + levelRing,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
+                  child: CustomPaint(
+                    painter: _CircleRingPainter(
                       color: AppColors.accent.withValues(alpha: 0.45),
-                      width: 3 + levelRing * 0.15,
+                      strokeWidth: 3 + levelRing * 0.15,
                     ),
                   ),
                 ),
@@ -308,40 +324,35 @@ class _PttButtonState extends State<_PttButton> with TickerProviderStateMixin {
             ],
           );
         },
-        child: GestureDetector(
-          onTapDown: _onDown,
-          onTapUp: _onUp,
-          onTapCancel: () => _onUp(),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOutCubic,
+        child: Listener(
+          onPointerDown: (_) => _onDown(),
+          onPointerUp: (_) => _onUp(),
+          onPointerCancel: (_) => _onUp(),
+          child: SizedBox(
             width: baseSize,
             height: baseSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
+            child: Material(
+              animationDuration: const Duration(milliseconds: 200),
               color: widget.isTransmitting
                   ? AppColors.accent
                   : AppColors.surfaceVariant,
-              border: Border.all(
-                color: widget.isTransmitting
-                    ? AppColors.accent
-                    : AppColors.error.withValues(alpha: 0.5),
-                width: widget.isTransmitting ? 2.5 : 1.5,
+              shape: CircleBorder(
+                side: BorderSide(
+                  color: widget.isTransmitting
+                      ? AppColors.accent
+                      : AppColors.error.withValues(alpha: 0.5),
+                  width: widget.isTransmitting ? 2.5 : 1.5,
+                ),
               ),
-              boxShadow: widget.isTransmitting
-                  ? [
-                      BoxShadow(
-                        color: AppColors.accent.withValues(alpha: 0.45),
-                        blurRadius: 24,
-                        spreadRadius: 2,
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Icon(
-              widget.isTransmitting ? Icons.mic_rounded : Icons.mic_off_rounded,
-              color: widget.isTransmitting ? Colors.white : AppColors.error,
-              size: 32,
+              elevation: widget.isTransmitting ? 6 : 0,
+              shadowColor: AppColors.accent.withValues(alpha: 0.45),
+              child: Icon(
+                widget.isTransmitting
+                    ? Icons.mic_rounded
+                    : Icons.mic_off_rounded,
+                color: widget.isTransmitting ? Colors.white : AppColors.error,
+                size: 32,
+              ),
             ),
           ),
         ),
@@ -355,18 +366,63 @@ class _PttButtonState extends State<_PttButton> with TickerProviderStateMixin {
       builder: (context, _) {
         final v = _pulseAnim.value;
         final size = baseSize + v * 36;
-        return Container(
+        return SizedBox(
           width: size,
           height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
+          child: CustomPaint(
+            painter: _CircleRingPainter(
               color: AppColors.accent.withValues(alpha: (1 - v) * 0.35),
-              width: 2,
+              strokeWidth: 2,
             ),
           ),
         );
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Host mute/unmute toggle button
+// ---------------------------------------------------------------------------
+
+class _MuteToggleButton extends StatelessWidget {
+  final bool isMuted;
+  final VoidCallback? onTap;
+
+  const _MuteToggleButton({required this.isMuted, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    const double size = 90;
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        onTap?.call();
+      },
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Material(
+          animationDuration: const Duration(milliseconds: 200),
+          color: isMuted ? AppColors.surfaceVariant : AppColors.accent,
+          shape: CircleBorder(
+            side: BorderSide(
+              color: isMuted
+                  ? AppColors.error.withValues(alpha: 0.5)
+                  : AppColors.accent,
+              width: isMuted ? 1.5 : 2.5,
+            ),
+          ),
+          elevation: isMuted ? 0 : 4,
+          shadowColor: AppColors.accent.withValues(alpha: 0.35),
+          child: Icon(
+            isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+            color: isMuted ? AppColors.error : Colors.white,
+            size: 32,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -398,11 +454,15 @@ class _ControlButton extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
+          SizedBox(
             width: 52,
             height: 52,
-            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-            child: Icon(icon, color: fg, size: 24),
+            child: Material(
+              color: bg,
+              shape: const CircleBorder(),
+              clipBehavior: Clip.antiAliasWithSaveLayer,
+              child: Icon(icon, color: fg, size: 24),
+            ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -416,4 +476,31 @@ class _ControlButton extends StatelessWidget {
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Anti-aliased circle ring painter for pulse / audio-level rings
+// ---------------------------------------------------------------------------
+
+class _CircleRingPainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+
+  _CircleRingPainter({required this.color, required this.strokeWidth});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..isAntiAlias = true;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.shortestSide - strokeWidth) / 2;
+    canvas.drawCircle(center, radius, paint);
+  }
+
+  @override
+  bool shouldRepaint(_CircleRingPainter oldDelegate) =>
+      color != oldDelegate.color || strokeWidth != oldDelegate.strokeWidth;
 }

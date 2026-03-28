@@ -36,6 +36,10 @@ class RoomRemoteDatasource {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<void> hostReady(String roomId) async {
+    await _dio.post('/rooms/$roomId/host-ready');
+  }
+
   Future<void> leaveRoom(String roomId) async {
     await _dio.post('/rooms/$roomId/leave');
   }

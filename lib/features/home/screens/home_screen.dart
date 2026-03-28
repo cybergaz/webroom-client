@@ -9,6 +9,7 @@ import '../../../features/auth/providers/auth_provider.dart';
 import '../../../shared/widgets/connection_status_bar.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/error_mapper.dart';
+import '../../../domain/enums/room_status.dart';
 import '../../../domain/enums/user_role.dart';
 import '../../room/providers/getstream_provider.dart';
 import '../../room/providers/room_session_provider.dart';
@@ -98,12 +99,13 @@ class HomeScreen extends ConsumerWidget {
                               room: rooms[i],
                               animationIndex: i,
                               onTap: () {
+                                final room = rooms[i];
                                 final activeCall = ref.read(activeCallProvider);
                                 final activeSession = ref.read(roomSessionProvider).value;
                                 if (activeCall != null &&
                                     activeSession != null &&
                                     activeSession.isInCall &&
-                                    activeSession.roomId != rooms[i].roomId) {
+                                    activeSession.roomId != room.roomId) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -119,7 +121,22 @@ class HomeScreen extends ConsumerWidget {
                                   );
                                   return;
                                 }
-                                context.push('/room/${rooms[i].roomId}');
+
+                                // Block normal users from entering non-live rooms
+                                if (user?.role == UserRole.user && room.status != RoomStatus.live) {
+                                  final msg = switch (room.status) {
+                                    RoomStatus.active => 'Room is not live yet. Waiting for the host to start.',
+                                    RoomStatus.inactive => 'This room has been disabled by admin.',
+                                    RoomStatus.ended => 'This room has ended.',
+                                    RoomStatus.live => '', // unreachable
+                                  };
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(msg)),
+                                  );
+                                  return;
+                                }
+
+                                context.push('/room/${room.roomId}');
                               },
                             ),
                             childCount: rooms.length,

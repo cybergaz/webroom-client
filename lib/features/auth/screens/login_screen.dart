@@ -36,11 +36,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _error = null;
     });
     try {
-      await ref.read(authStateProvider.notifier).login(
-        phone: _loginMethod == _LoginMethod.phone ? _phone : null,
-        email: _loginMethod == _LoginMethod.email ? _email : null,
-        password: _password,
-      );
+      await ref
+          .read(authStateProvider.notifier)
+          .login(
+            phone: _loginMethod == _LoginMethod.phone ? _phone : null,
+            email: _loginMethod == _LoginMethod.email ? _email : null,
+            password: _password,
+          );
       if (!mounted) return;
       final authState = ref.read(authStateProvider);
       if (authState case AuthStateAuthenticated(:final user)) {
@@ -155,7 +157,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
                       labelText: 'Email',
-                      prefixIcon: Icon(Icons.email_outlined, color: AppColors.textSecondary),
+                      prefixIcon: Icon(
+                        Icons.email_outlined,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     onChanged: (v) => _email = v,
                     validator: (v) {

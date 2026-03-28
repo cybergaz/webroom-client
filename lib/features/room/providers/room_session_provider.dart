@@ -29,6 +29,8 @@ abstract class RoomSession with _$RoomSession {
     @Default(false) bool isInCall,
     @Default(false) bool isEnded,
     @Default(false) bool isHost,
+    @Default(false) bool isHostDisconnected,
+    @Default(0) int hostGraceSeconds,
   }) = _RoomSession;
 }
 
@@ -337,6 +339,14 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
       print("-----------------------------------------------------------");
       print("goLive result: ${goLiveRes.toString()}");
       print("-----------------------------------------------------------");
+
+      // Notify server that the host is actually in the call and ready.
+      // This triggers the room.status_changed broadcast to members.
+      try {
+        await _repo().hostReady(roomId);
+      } catch (e) {
+        print("hostReady call failed (non-fatal): $e");
+      }
     } else {}
 
     print("entercall: chk 6");
@@ -412,6 +422,19 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
                   permissions: [CallPermission.sendAudio],
                 )
                 .catchError((_) {}); // fire-and-forget
+          }
+        }
+      } else {
+        // Non-host users should only hear the host, not other participants.
+        // Disable audio tracks of non-host remote participants locally.
+        for (final p in callState.callParticipants) {
+          if (p.isLocal) continue;
+          final track = call.getTrack(p.trackIdPrefix, SfuTrackType.audio);
+          if (track == null) continue;
+          if (p.roles.contains('host')) {
+            track.enable();
+          } else {
+            track.disable();
           }
         }
       }
@@ -499,6 +522,29 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
             state = AsyncData(current.copyWith(isEnded: true));
             await leaveRoom();
           }
+
+        case 'room.status_changed':
+          final statusStr = payload['status'] as String?;
+          if (statusStr != null) {
+            final newStatus = RoomStatus.values.firstWhere(
+              (s) => s.name == statusStr,
+              orElse: () => current.status,
+            );
+            state = AsyncData(current.copyWith(status: newStatus));
+          }
+
+        case 'room.host_disconnected':
+          final graceSeconds = payload['gracePeriodSeconds'] as num? ?? 30;
+          state = AsyncData(current.copyWith(
+            isHostDisconnected: true,
+            hostGraceSeconds: graceSeconds.toInt(),
+          ));
+
+        case 'room.host_reconnected':
+          state = AsyncData(current.copyWith(
+            isHostDisconnected: false,
+            hostGraceSeconds: 0,
+          ));
       }
     });
   }

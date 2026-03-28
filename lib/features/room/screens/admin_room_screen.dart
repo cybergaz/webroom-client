@@ -5,7 +5,6 @@ import 'package:stream_video/stream_video.dart';
 
 import '../providers/getstream_provider.dart';
 import '../providers/room_session_provider.dart';
-import '../providers/ptt_provider.dart';
 import '../widgets/call_controls_bar.dart';
 import '../widgets/participants_grid.dart';
 import 'call_participants_screen.dart';
@@ -102,18 +101,22 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
   }
 
   Widget _buildControls(Call call) {
-    final ptt = ref.watch(pttStateProvider);
-    return CallControlsBar(
-      call: call,
-      isHost: true,
-      isTransmitting: ptt.isTransmitting,
-      audioLevel: ptt.audioLevel,
-      onPttDown: () => ref.read(pttStateProvider.notifier).startTransmitting(),
-      onPttUp: () => ref.read(pttStateProvider.notifier).stopTransmitting(),
-      onEndOrLeave: () async {
-        await ref.read(pttStateProvider.notifier).stopTransmitting();
-        await ref.read(roomSessionProvider.notifier).endRoom();
-        if (context.mounted) context.go('/home');
+    return StreamBuilder<CallState>(
+      stream: call.state.valueStream,
+      initialData: call.state.valueOrNull,
+      builder: (context, snapshot) {
+        final isMuted = !(snapshot.data?.localParticipant?.isAudioEnabled ?? false);
+        return CallControlsBar(
+          call: call,
+          isHost: true,
+          isMuted: isMuted,
+          onMuteToggle: () => call.setMicrophoneEnabled(enabled: isMuted),
+          onEndOrLeave: () async {
+            await call.setMicrophoneEnabled(enabled: false);
+            await ref.read(roomSessionProvider.notifier).endRoom();
+            if (context.mounted) context.go('/home');
+          },
+        );
       },
     );
   }

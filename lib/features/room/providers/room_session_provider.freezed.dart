@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$RoomSession {
 
- String get roomId; String get roomName; RoomStatus get status; List<RoomMemberModel> get members; String get getstreamCallId; bool get isInCall; bool get isEnded; bool get isHost; bool get joinFailed;
+ String get roomId; String get roomName; RoomStatus get status; List<RoomMemberModel> get members; String get getstreamCallId; bool get isInCall; bool get isEnded; bool get isHost; bool get isHostDisconnected; int get hostGraceSeconds;
 /// Create a copy of RoomSession
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -25,16 +25,16 @@ $RoomSessionCopyWith<RoomSession> get copyWith => _$RoomSessionCopyWithImpl<Room
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is RoomSession&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.roomName, roomName) || other.roomName == roomName)&&(identical(other.status, status) || other.status == status)&&const DeepCollectionEquality().equals(other.members, members)&&(identical(other.getstreamCallId, getstreamCallId) || other.getstreamCallId == getstreamCallId)&&(identical(other.isInCall, isInCall) || other.isInCall == isInCall)&&(identical(other.isEnded, isEnded) || other.isEnded == isEnded)&&(identical(other.isHost, isHost) || other.isHost == isHost)&&(identical(other.joinFailed, joinFailed) || other.joinFailed == joinFailed));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is RoomSession&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.roomName, roomName) || other.roomName == roomName)&&(identical(other.status, status) || other.status == status)&&const DeepCollectionEquality().equals(other.members, members)&&(identical(other.getstreamCallId, getstreamCallId) || other.getstreamCallId == getstreamCallId)&&(identical(other.isInCall, isInCall) || other.isInCall == isInCall)&&(identical(other.isEnded, isEnded) || other.isEnded == isEnded)&&(identical(other.isHost, isHost) || other.isHost == isHost)&&(identical(other.isHostDisconnected, isHostDisconnected) || other.isHostDisconnected == isHostDisconnected)&&(identical(other.hostGraceSeconds, hostGraceSeconds) || other.hostGraceSeconds == hostGraceSeconds));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,roomId,roomName,status,const DeepCollectionEquality().hash(members),getstreamCallId,isInCall,isEnded,isHost,joinFailed);
+int get hashCode => Object.hash(runtimeType,roomId,roomName,status,const DeepCollectionEquality().hash(members),getstreamCallId,isInCall,isEnded,isHost,isHostDisconnected,hostGraceSeconds);
 
 @override
 String toString() {
-  return 'RoomSession(roomId: $roomId, roomName: $roomName, status: $status, members: $members, getstreamCallId: $getstreamCallId, isInCall: $isInCall, isEnded: $isEnded, isHost: $isHost, joinFailed: $joinFailed)';
+  return 'RoomSession(roomId: $roomId, roomName: $roomName, status: $status, members: $members, getstreamCallId: $getstreamCallId, isInCall: $isInCall, isEnded: $isEnded, isHost: $isHost, isHostDisconnected: $isHostDisconnected, hostGraceSeconds: $hostGraceSeconds)';
 }
 
 
@@ -45,7 +45,7 @@ abstract mixin class $RoomSessionCopyWith<$Res>  {
   factory $RoomSessionCopyWith(RoomSession value, $Res Function(RoomSession) _then) = _$RoomSessionCopyWithImpl;
 @useResult
 $Res call({
- String roomId, String roomName, RoomStatus status, List<RoomMemberModel> members, String getstreamCallId, bool isInCall, bool isEnded, bool isHost, bool joinFailed
+ String roomId, String roomName, RoomStatus status, List<RoomMemberModel> members, String getstreamCallId, bool isInCall, bool isEnded, bool isHost, bool isHostDisconnected, int hostGraceSeconds
 });
 
 
@@ -62,7 +62,7 @@ class _$RoomSessionCopyWithImpl<$Res>
 
 /// Create a copy of RoomSession
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? roomId = null,Object? roomName = null,Object? status = null,Object? members = null,Object? getstreamCallId = null,Object? isInCall = null,Object? isEnded = null,Object? isHost = null,Object? joinFailed = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? roomId = null,Object? roomName = null,Object? status = null,Object? members = null,Object? getstreamCallId = null,Object? isInCall = null,Object? isEnded = null,Object? isHost = null,Object? isHostDisconnected = null,Object? hostGraceSeconds = null,}) {
   return _then(_self.copyWith(
 roomId: null == roomId ? _self.roomId : roomId // ignore: cast_nullable_to_non_nullable
 as String,roomName: null == roomName ? _self.roomName : roomName // ignore: cast_nullable_to_non_nullable
@@ -72,8 +72,9 @@ as List<RoomMemberModel>,getstreamCallId: null == getstreamCallId ? _self.getstr
 as String,isInCall: null == isInCall ? _self.isInCall : isInCall // ignore: cast_nullable_to_non_nullable
 as bool,isEnded: null == isEnded ? _self.isEnded : isEnded // ignore: cast_nullable_to_non_nullable
 as bool,isHost: null == isHost ? _self.isHost : isHost // ignore: cast_nullable_to_non_nullable
-as bool,joinFailed: null == joinFailed ? _self.joinFailed : joinFailed // ignore: cast_nullable_to_non_nullable
-as bool,
+as bool,isHostDisconnected: null == isHostDisconnected ? _self.isHostDisconnected : isHostDisconnected // ignore: cast_nullable_to_non_nullable
+as bool,hostGraceSeconds: null == hostGraceSeconds ? _self.hostGraceSeconds : hostGraceSeconds // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 
@@ -158,10 +159,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String roomId,  String roomName,  RoomStatus status,  List<RoomMemberModel> members,  String getstreamCallId,  bool isInCall,  bool isEnded,  bool isHost,  bool joinFailed)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String roomId,  String roomName,  RoomStatus status,  List<RoomMemberModel> members,  String getstreamCallId,  bool isInCall,  bool isEnded,  bool isHost,  bool isHostDisconnected,  int hostGraceSeconds)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _RoomSession() when $default != null:
-return $default(_that.roomId,_that.roomName,_that.status,_that.members,_that.getstreamCallId,_that.isInCall,_that.isEnded,_that.isHost,_that.joinFailed);case _:
+return $default(_that.roomId,_that.roomName,_that.status,_that.members,_that.getstreamCallId,_that.isInCall,_that.isEnded,_that.isHost,_that.isHostDisconnected,_that.hostGraceSeconds);case _:
   return orElse();
 
 }
@@ -179,10 +180,10 @@ return $default(_that.roomId,_that.roomName,_that.status,_that.members,_that.get
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String roomId,  String roomName,  RoomStatus status,  List<RoomMemberModel> members,  String getstreamCallId,  bool isInCall,  bool isEnded,  bool isHost,  bool joinFailed)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String roomId,  String roomName,  RoomStatus status,  List<RoomMemberModel> members,  String getstreamCallId,  bool isInCall,  bool isEnded,  bool isHost,  bool isHostDisconnected,  int hostGraceSeconds)  $default,) {final _that = this;
 switch (_that) {
 case _RoomSession():
-return $default(_that.roomId,_that.roomName,_that.status,_that.members,_that.getstreamCallId,_that.isInCall,_that.isEnded,_that.isHost,_that.joinFailed);case _:
+return $default(_that.roomId,_that.roomName,_that.status,_that.members,_that.getstreamCallId,_that.isInCall,_that.isEnded,_that.isHost,_that.isHostDisconnected,_that.hostGraceSeconds);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -199,10 +200,10 @@ return $default(_that.roomId,_that.roomName,_that.status,_that.members,_that.get
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String roomId,  String roomName,  RoomStatus status,  List<RoomMemberModel> members,  String getstreamCallId,  bool isInCall,  bool isEnded,  bool isHost,  bool joinFailed)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String roomId,  String roomName,  RoomStatus status,  List<RoomMemberModel> members,  String getstreamCallId,  bool isInCall,  bool isEnded,  bool isHost,  bool isHostDisconnected,  int hostGraceSeconds)?  $default,) {final _that = this;
 switch (_that) {
 case _RoomSession() when $default != null:
-return $default(_that.roomId,_that.roomName,_that.status,_that.members,_that.getstreamCallId,_that.isInCall,_that.isEnded,_that.isHost,_that.joinFailed);case _:
+return $default(_that.roomId,_that.roomName,_that.status,_that.members,_that.getstreamCallId,_that.isInCall,_that.isEnded,_that.isHost,_that.isHostDisconnected,_that.hostGraceSeconds);case _:
   return null;
 
 }
@@ -214,7 +215,7 @@ return $default(_that.roomId,_that.roomName,_that.status,_that.members,_that.get
 
 
 class _RoomSession implements RoomSession {
-  const _RoomSession({required this.roomId, required this.roomName, required this.status, required final  List<RoomMemberModel> members, required this.getstreamCallId, this.isInCall = false, this.isEnded = false, this.isHost = false, this.joinFailed = false}): _members = members;
+  const _RoomSession({required this.roomId, required this.roomName, required this.status, required final  List<RoomMemberModel> members, required this.getstreamCallId, this.isInCall = false, this.isEnded = false, this.isHost = false, this.isHostDisconnected = false, this.hostGraceSeconds = 0}): _members = members;
   
 
 @override final  String roomId;
@@ -231,7 +232,8 @@ class _RoomSession implements RoomSession {
 @override@JsonKey() final  bool isInCall;
 @override@JsonKey() final  bool isEnded;
 @override@JsonKey() final  bool isHost;
-@override@JsonKey() final  bool joinFailed;
+@override@JsonKey() final  bool isHostDisconnected;
+@override@JsonKey() final  int hostGraceSeconds;
 
 /// Create a copy of RoomSession
 /// with the given fields replaced by the non-null parameter values.
@@ -243,16 +245,16 @@ _$RoomSessionCopyWith<_RoomSession> get copyWith => __$RoomSessionCopyWithImpl<_
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _RoomSession&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.roomName, roomName) || other.roomName == roomName)&&(identical(other.status, status) || other.status == status)&&const DeepCollectionEquality().equals(other._members, _members)&&(identical(other.getstreamCallId, getstreamCallId) || other.getstreamCallId == getstreamCallId)&&(identical(other.isInCall, isInCall) || other.isInCall == isInCall)&&(identical(other.isEnded, isEnded) || other.isEnded == isEnded)&&(identical(other.isHost, isHost) || other.isHost == isHost)&&(identical(other.joinFailed, joinFailed) || other.joinFailed == joinFailed));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _RoomSession&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.roomName, roomName) || other.roomName == roomName)&&(identical(other.status, status) || other.status == status)&&const DeepCollectionEquality().equals(other._members, _members)&&(identical(other.getstreamCallId, getstreamCallId) || other.getstreamCallId == getstreamCallId)&&(identical(other.isInCall, isInCall) || other.isInCall == isInCall)&&(identical(other.isEnded, isEnded) || other.isEnded == isEnded)&&(identical(other.isHost, isHost) || other.isHost == isHost)&&(identical(other.isHostDisconnected, isHostDisconnected) || other.isHostDisconnected == isHostDisconnected)&&(identical(other.hostGraceSeconds, hostGraceSeconds) || other.hostGraceSeconds == hostGraceSeconds));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,roomId,roomName,status,const DeepCollectionEquality().hash(_members),getstreamCallId,isInCall,isEnded,isHost,joinFailed);
+int get hashCode => Object.hash(runtimeType,roomId,roomName,status,const DeepCollectionEquality().hash(_members),getstreamCallId,isInCall,isEnded,isHost,isHostDisconnected,hostGraceSeconds);
 
 @override
 String toString() {
-  return 'RoomSession(roomId: $roomId, roomName: $roomName, status: $status, members: $members, getstreamCallId: $getstreamCallId, isInCall: $isInCall, isEnded: $isEnded, isHost: $isHost, joinFailed: $joinFailed)';
+  return 'RoomSession(roomId: $roomId, roomName: $roomName, status: $status, members: $members, getstreamCallId: $getstreamCallId, isInCall: $isInCall, isEnded: $isEnded, isHost: $isHost, isHostDisconnected: $isHostDisconnected, hostGraceSeconds: $hostGraceSeconds)';
 }
 
 
@@ -263,7 +265,7 @@ abstract mixin class _$RoomSessionCopyWith<$Res> implements $RoomSessionCopyWith
   factory _$RoomSessionCopyWith(_RoomSession value, $Res Function(_RoomSession) _then) = __$RoomSessionCopyWithImpl;
 @override @useResult
 $Res call({
- String roomId, String roomName, RoomStatus status, List<RoomMemberModel> members, String getstreamCallId, bool isInCall, bool isEnded, bool isHost, bool joinFailed
+ String roomId, String roomName, RoomStatus status, List<RoomMemberModel> members, String getstreamCallId, bool isInCall, bool isEnded, bool isHost, bool isHostDisconnected, int hostGraceSeconds
 });
 
 
@@ -280,7 +282,7 @@ class __$RoomSessionCopyWithImpl<$Res>
 
 /// Create a copy of RoomSession
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? roomId = null,Object? roomName = null,Object? status = null,Object? members = null,Object? getstreamCallId = null,Object? isInCall = null,Object? isEnded = null,Object? isHost = null,Object? joinFailed = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? roomId = null,Object? roomName = null,Object? status = null,Object? members = null,Object? getstreamCallId = null,Object? isInCall = null,Object? isEnded = null,Object? isHost = null,Object? isHostDisconnected = null,Object? hostGraceSeconds = null,}) {
   return _then(_RoomSession(
 roomId: null == roomId ? _self.roomId : roomId // ignore: cast_nullable_to_non_nullable
 as String,roomName: null == roomName ? _self.roomName : roomName // ignore: cast_nullable_to_non_nullable
@@ -290,8 +292,9 @@ as List<RoomMemberModel>,getstreamCallId: null == getstreamCallId ? _self.getstr
 as String,isInCall: null == isInCall ? _self.isInCall : isInCall // ignore: cast_nullable_to_non_nullable
 as bool,isEnded: null == isEnded ? _self.isEnded : isEnded // ignore: cast_nullable_to_non_nullable
 as bool,isHost: null == isHost ? _self.isHost : isHost // ignore: cast_nullable_to_non_nullable
-as bool,joinFailed: null == joinFailed ? _self.joinFailed : joinFailed // ignore: cast_nullable_to_non_nullable
-as bool,
+as bool,isHostDisconnected: null == isHostDisconnected ? _self.isHostDisconnected : isHostDisconnected // ignore: cast_nullable_to_non_nullable
+as bool,hostGraceSeconds: null == hostGraceSeconds ? _self.hostGraceSeconds : hostGraceSeconds // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 

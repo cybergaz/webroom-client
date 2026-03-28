@@ -29,6 +29,8 @@ class UserRoomScreen extends ConsumerStatefulWidget {
 class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
   StreamSubscription? _wsSub;
   late final IsOnRoomScreenNotifier _roomScreenNotifier;
+  Timer? _graceCountdownTimer;
+  int _graceSecondsRemaining = 0;
 
   @override
   void initState() {
@@ -44,6 +46,7 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
   @override
   void dispose() {
     Future.microtask(() => _roomScreenNotifier.set(false));
+    _graceCountdownTimer?.cancel();
     _wsSub?.cancel();
     super.dispose();
   }
@@ -78,22 +81,50 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
     });
   }
 
+  void _startGraceCountdown(int totalSeconds) {
+    _graceCountdownTimer?.cancel();
+    _graceSecondsRemaining = totalSeconds;
+    _graceCountdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) {
+        _graceCountdownTimer?.cancel();
+        return;
+      }
+      setState(() {
+        _graceSecondsRemaining = (_graceSecondsRemaining - 1).clamp(0, totalSeconds);
+      });
+    });
+  }
+
+  void _stopGraceCountdown() {
+    _graceCountdownTimer?.cancel();
+    if (mounted) setState(() => _graceSecondsRemaining = 0);
+  }
+
   @override
   Widget build(BuildContext context) {
-    ref.listen(roomSessionProvider, (_, next) {
+    ref.listen(roomSessionProvider, (prev, next) {
       next.whenData((session) {
         if (session.isEnded && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Room ended by host')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Room ended by host')));
           context.go('/home');
+        }
+
+        final wasDisconnected = prev?.value?.isHostDisconnected ?? false;
+        if (session.isHostDisconnected && !wasDisconnected) {
+          _startGraceCountdown(session.hostGraceSeconds);
+        } else if (!session.isHostDisconnected && wasDisconnected) {
+          _stopGraceCountdown();
         }
       });
     });
 
     final call = ref.watch(activeCallProvider);
     final sessionState = ref.watch(roomSessionProvider);
-    final roomName = sessionState.isLoading ? '' : (sessionState.value?.roomName ?? '');
+    final roomName = sessionState.isLoading
+        ? ''
+        : (sessionState.value?.roomName ?? '');
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -101,11 +132,18 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
         backgroundColor: AppColors.surface,
         title: Text(
           roomName.isEmpty ? '' : roomName,
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textSecondary),
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: AppColors.textSecondary,
+          ),
           onPressed: () => context.go('/home'),
         ),
       ),
@@ -113,13 +151,34 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
         bottom: false,
         child: Column(
           children: [
+            // Host disconnection warning banner
+            if (sessionState.value?.isHostDisconnected == true)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                color: AppColors.warning,
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Colors.black87, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Host disconnected. Room will end in ${_graceSecondsRemaining}s...',
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             if (call == null)
-              const Expanded(
-                child: Center(child: CircularProgressIndicator()),
-              )
+              const Expanded(child: Center(child: CircularProgressIndicator()))
             else ...[
               // Participants area
-              Expanded(child: ParticipantsGrid(call: call)),
+              Expanded(child: ParticipantsGrid(call: call, hostOnly: true)),
               _buildControls(call),
             ],
           ],
