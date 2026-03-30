@@ -4,6 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/error_mapper.dart';
+import '../../../core/storage/secure_storage.dart';
+import '../../../core/constants/storage_keys.dart';
 import '../../../data/datasources/auth_remote_datasource.dart';
 import '../../../core/network/dio_client.dart';
 import '../widgets/auth_button.dart';
@@ -21,6 +23,20 @@ class _CheckStatusScreenState extends ConsumerState<CheckStatusScreen> {
   String? _status;
   String? _error;
   final _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStoredRequestId();
+  }
+
+  Future<void> _loadStoredRequestId() async {
+    final storage = ref.read(secureStorageProvider);
+    final storedId = await storage.read(StorageKeys.requestId);
+    if (storedId != null && mounted) {
+      _requestIdController.text = storedId;
+    }
+  }
 
   @override
   void dispose() {

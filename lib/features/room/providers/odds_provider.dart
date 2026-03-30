@@ -24,8 +24,9 @@ class OddsState {
   final MarketOdds? odds;
   final bool isLoadingCompetitions;
   final bool isLoadingEvents;
-  final bool isLoadingMarket;
+  final String? loadingEventId;
   final bool isPolling;
+  final int refreshCountdown;
   final String? error;
 
   const OddsState({
@@ -38,8 +39,9 @@ class OddsState {
     this.odds,
     this.isLoadingCompetitions = false,
     this.isLoadingEvents = false,
-    this.isLoadingMarket = false,
+    this.loadingEventId,
     this.isPolling = false,
+    this.refreshCountdown = 3,
     this.error,
   });
 
@@ -53,11 +55,13 @@ class OddsState {
     MarketOdds? odds,
     bool? isLoadingCompetitions,
     bool? isLoadingEvents,
-    bool? isLoadingMarket,
+    String? loadingEventId,
     bool? isPolling,
+    int? refreshCountdown,
     String? error,
     bool clearOdds = false,
     bool clearMarketId = false,
+    bool clearLoadingEventId = false,
     bool clearEventName = false,
     bool clearCompetitionName = false,
     bool clearError = false,
@@ -77,11 +81,16 @@ class OddsState {
       isLoadingCompetitions:
           isLoadingCompetitions ?? this.isLoadingCompetitions,
       isLoadingEvents: isLoadingEvents ?? this.isLoadingEvents,
-      isLoadingMarket: isLoadingMarket ?? this.isLoadingMarket,
+      loadingEventId: clearLoadingEventId
+          ? null
+          : (loadingEventId ?? this.loadingEventId),
       isPolling: isPolling ?? this.isPolling,
+      refreshCountdown: refreshCountdown ?? this.refreshCountdown,
       error: clearError ? null : (error ?? this.error),
     );
   }
+
+  bool get isLoadingMarket => loadingEventId != null;
 
   bool get hasActiveOdds =>
       marketId != null && odds != null && runners.isNotEmpty;
@@ -89,18 +98,23 @@ class OddsState {
 
 class OddsNotifier extends Notifier<OddsState> {
   Timer? _pollTimer;
+  Timer? _countdownTimer;
 
   @override
   OddsState build() {
-    ref.onDispose(() => _pollTimer?.cancel());
+    ref.onDispose(() {
+      _pollTimer?.cancel();
+      _countdownTimer?.cancel();
+    });
     return const OddsState();
   }
 
   Future<void> fetchCompetitions() async {
     state = state.copyWith(isLoadingCompetitions: true, clearError: true);
     try {
-      final response = await _sportsDio.get('/competitions/list/4');
-      final list = (response.data as List<dynamic>)
+      final response = await Dio().get(AppConstants.aiexchcompetitionsUrl);
+      final data = response.data as Map<String, dynamic>;
+      final list = ((data['data'] as List<dynamic>?) ?? [])
           .map((e) => Competition.fromJson(e as Map<String, dynamic>))
           .toList();
       state = state.copyWith(competitions: list, isLoadingCompetitions: false);
@@ -140,8 +154,9 @@ class OddsNotifier extends Notifier<OddsState> {
 
   Future<bool> selectEvent(String eventId, String eventName) async {
     _pollTimer?.cancel();
+    _countdownTimer?.cancel();
     state = state.copyWith(
-      isLoadingMarket: true,
+      loadingEventId: eventId,
       selectedEventName: eventName,
       clearError: true,
       clearOdds: true,
@@ -151,17 +166,18 @@ class OddsNotifier extends Notifier<OddsState> {
       final eventResponse = await _sportsDio.get('/events/$eventId');
       final eventData = eventResponse.data as Map<String, dynamic>;
       final catalogues = (eventData['catalogues'] as List<dynamic>?) ?? [];
+      print('[ODDS] eventId=$eventId catalogues=${catalogues.length}');
 
       String? matchOddsMarketId;
       List<RunnerInfo> runners = [];
 
       for (final cat in catalogues) {
         final catMap = cat as Map<String, dynamic>;
+        print('[ODDS] catalogue marketType=${catMap['marketType']}');
         if (catMap['marketType'] == 'MATCH_ODDS') {
           matchOddsMarketId = catMap['marketId'] as String;
           // Runner names are already in the catalogue
-          final runnersData =
-              (catMap['runners'] as List<dynamic>?) ?? [];
+          final runnersData = (catMap['runners'] as List<dynamic>?) ?? [];
           runners = runnersData.map((r) {
             final rm = r as Map<String, dynamic>;
             return RunnerInfo(
@@ -169,14 +185,20 @@ class OddsNotifier extends Notifier<OddsState> {
               name: rm['name'] as String? ?? 'Unknown',
             );
           }).toList();
+          print(
+            '[ODDS] found MATCH_ODDS marketId=$matchOddsMarketId runners=${runners.length}',
+          );
           break;
         }
       }
 
-      if (matchOddsMarketId == null) {
+      if (matchOddsMarketId == null || runners.isEmpty) {
+        print(
+          '[ODDS] no market data: marketId=$matchOddsMarketId runners=${runners.length}',
+        );
         state = state.copyWith(
-          isLoadingMarket: false,
-          error: 'No match odds market found',
+          clearLoadingEventId: true,
+          error: 'No market data found',
         );
         return false;
       }
@@ -184,27 +206,40 @@ class OddsNotifier extends Notifier<OddsState> {
       state = state.copyWith(
         marketId: matchOddsMarketId,
         runners: runners,
-        isLoadingMarket: false,
+        clearLoadingEventId: true,
       );
 
       // Start polling odds every 3 seconds
       _startPolling(matchOddsMarketId);
+      print('[ODDS] polling started, hasActiveOdds=${state.hasActiveOdds}');
       return true;
     } catch (e) {
+      print('[ODDS] selectEvent error: $e');
       state = state.copyWith(
-        isLoadingMarket: false,
+        clearLoadingEventId: true,
         error: 'Failed to load market data',
       );
       return false;
     }
   }
 
+  int _emptyFetchCount = 0;
+  static const _maxEmptyFetches = 2;
+
   void _startPolling(String marketId) {
     _pollTimer?.cancel();
-    state = state.copyWith(isPolling: true);
+    _countdownTimer?.cancel();
+    _emptyFetchCount = 0;
+    state = state.copyWith(isPolling: true, refreshCountdown: 3);
     _fetchOdds(marketId);
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      _fetchOdds(marketId);
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final next = state.refreshCountdown - 1;
+      if (next <= 0) {
+        state = state.copyWith(refreshCountdown: 3);
+        _fetchOdds(marketId);
+      } else {
+        state = state.copyWith(refreshCountdown: next);
+      }
     });
   }
 
@@ -213,17 +248,36 @@ class OddsNotifier extends Notifier<OddsState> {
       final response = await _sportsDio.get('/books/$marketId');
       final data = response.data as Map<String, dynamic>;
       final marketData = data[marketId] as Map<String, dynamic>?;
+      print(
+        '[ODDS] fetchOdds marketId=$marketId hasData=${marketData != null} runners=${marketData?['runners']?.length}',
+      );
       if (marketData != null) {
+        _emptyFetchCount = 0;
         state = state.copyWith(odds: MarketOdds.fromJson(marketId, marketData));
+        print(
+          '[ODDS] hasActiveOdds=${state.hasActiveOdds} odds.runners=${state.odds?.runners.length}',
+        );
+      } else {
+        _emptyFetchCount++;
+        if (_emptyFetchCount >= _maxEmptyFetches) {
+          print('[ODDS] giving up after $_maxEmptyFetches empty fetches');
+          stopPolling();
+          state = state.copyWith(error: 'No market data available');
+        }
       }
-    } catch (_) {
-      // Silent fail - retry in 3s
+    } catch (e) {
+      print('[ODDS] fetchOdds error: $e');
     }
   }
 
   void stopPolling() {
     _pollTimer?.cancel();
+    _countdownTimer?.cancel();
     state = const OddsState();
+  }
+
+  void clearError() {
+    state = state.copyWith(clearError: true);
   }
 
   String runnerName(int selectionId) {

@@ -6,8 +6,9 @@ import '../../../core/theme/app_colors.dart';
 class ParticipantsGrid extends StatelessWidget {
   final Call call;
   final bool hostOnly;
+  final bool excludeLocal;
 
-  const ParticipantsGrid({super.key, required this.call, this.hostOnly = false});
+  const ParticipantsGrid({super.key, required this.call, this.hostOnly = false, this.excludeLocal = false});
 
   @override
   Widget build(BuildContext context) {
@@ -21,12 +22,17 @@ class ParticipantsGrid extends StatelessWidget {
               .where((p) => p.roles.contains('host'))
               .toList();
         }
+        if (excludeLocal) {
+          participants = participants
+              .where((p) => !p.isLocal)
+              .toList();
+        }
 
         if (participants.isEmpty) {
-          return const Center(
+          return Center(
             child: Text(
-              'Waiting for participants...',
-              style: TextStyle(color: AppColors.textSecondary),
+              excludeLocal ? "You're the only one here" : 'Waiting for participants...',
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
           );
         }

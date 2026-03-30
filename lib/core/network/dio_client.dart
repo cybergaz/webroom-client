@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/app_constants.dart';
 import '../storage/secure_storage.dart';
 import 'auth_interceptor.dart';
+import '../../features/auth/providers/auth_provider.dart';
 
 final dioClientProvider = Provider<Dio>((ref) {
   final storage = ref.read(secureStorageProvider);
@@ -16,7 +17,9 @@ final dioClientProvider = Provider<Dio>((ref) {
   );
 
   dio.interceptors.addAll([
-    AuthInterceptor(dio, storage),
+    AuthInterceptor(dio, storage, onForceLogout: () async {
+      ref.read(authStateProvider.notifier).forceLogout();
+    }),
     LogInterceptor(requestBody: true, responseBody: true),
   ]);
 

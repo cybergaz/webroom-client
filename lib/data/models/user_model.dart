@@ -13,6 +13,8 @@ abstract class UserModel with _$UserModel {
     String? email,
     required UserRole role,
     required String status,
+    String? requestId,
+    String? profilePic,
   }) = _UserModel;
 
   factory UserModel.fromJson(Map<String, dynamic> json) => _$UserModelFromJson(json);

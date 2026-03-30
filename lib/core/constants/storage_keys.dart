@@ -7,4 +7,6 @@ class StorageKeys {
   static const String userStatus = 'user_status';
   static const String userName = 'user_name';
   static const String requestId = 'request_id';
+  static const String userPhone = 'user_phone';
+  static const String userEmail = 'user_email';
 }

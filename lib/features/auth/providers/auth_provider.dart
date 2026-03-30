@@ -49,6 +49,9 @@ class AuthNotifier extends Notifier<AuthState> {
 
     final userId = await storage.read(StorageKeys.userId);
     final userName = await storage.read(StorageKeys.userName) ?? '';
+    final userPhone = await storage.read(StorageKeys.userPhone);
+    final userEmail = await storage.read(StorageKeys.userEmail);
+    final userRequestId = await storage.read(StorageKeys.requestId);
     final getstreamToken = await storage.read(StorageKeys.getstreamToken);
 
     if (userId != null && roleStr != null) {
@@ -59,9 +62,11 @@ class AuthNotifier extends Notifier<AuthState> {
       final user = UserModel(
         userId: userId,
         name: userName,
-        phone: '',
+        phone: userPhone,
+        email: userEmail,
         role: role,
         status: userStatus ?? 'approved',
+        requestId: userRequestId,
       );
       // Re-initialize StreamVideo for this user session.
       // Wrapped in try/catch so a GetStream failure doesn't block auth.
@@ -128,6 +133,10 @@ class AuthNotifier extends Notifier<AuthState> {
     );
 
     state = AuthState.authenticated(user: result.user);
+  }
+
+  void forceLogout() {
+    state = const AuthState.unauthenticated();
   }
 
   Future<void> logout() async {

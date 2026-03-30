@@ -28,124 +28,114 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        leading: IconButton(
+          icon: const Icon(Icons.person_rounded),
+          tooltip: 'Profile',
+          onPressed: () => context.push('/profile'),
+        ),
+        title: _AppBarTitle(name: user?.name, role: user?.role),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh',
+            onPressed: () =>
+                ref.read(roomsProvider.notifier).refresh(),
+          ),
+        ],
+      ),
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
             const ConnectionStatusBar(),
             Expanded(
-              child: CustomScrollView(
-                slivers: [
-                  SliverAppBar(
-                    backgroundColor: AppColors.background,
-                    pinned: true,
-                    title: _AppBarTitle(name: user?.name, role: user?.role),
-                    actions: [
-                      IconButton(
-                        icon: const Icon(Icons.refresh_rounded),
-                        tooltip: 'Refresh',
+              child: roomsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        mapErrorToMessage(e),
+                        style: const TextStyle(color: AppColors.error),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
                         onPressed: () =>
                             ref.read(roomsProvider.notifier).refresh(),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.logout_rounded),
-                        onPressed: () async {
-                          await ref.read(authStateProvider.notifier).logout();
-                          if (context.mounted) context.go('/login');
-                        },
+                        child: const Text('Retry'),
                       ),
                     ],
                   ),
-                  roomsAsync.when(
-                    loading: () => const SliverFillRemaining(
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                    error: (e, _) => SliverFillRemaining(
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              mapErrorToMessage(e),
-                              style: const TextStyle(color: AppColors.error),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: () =>
-                                  ref.read(roomsProvider.notifier).refresh(),
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        ),
+                ),
+                data: (rooms) {
+                  if (rooms.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No rooms yet',
+                        style: TextStyle(color: AppColors.textSecondary),
+                        textAlign: TextAlign.center,
                       ),
+                    );
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: rooms.length,
+                    itemBuilder: (context, i) => RoomCard(
+                      room: rooms[i],
+                      animationIndex: i,
+                      onTap: () {
+                        final room = rooms[i];
+                        final activeCall = ref.read(activeCallProvider);
+                        final activeSession = ref
+                            .read(roomSessionProvider)
+                            .value;
+                        if (activeCall != null &&
+                            activeSession != null &&
+                            activeSession.isInCall &&
+                            activeSession.roomId != room.roomId) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'You are already in "${activeSession.roomName}". Leave it first.',
+                              ),
+                              action: SnackBarAction(
+                                label: 'Go back',
+                                onPressed: () {
+                                  context.push(
+                                    '/room/${activeSession.roomId}',
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+
+                        // Block normal users from entering non-live rooms
+                        if (user?.role == UserRole.user &&
+                            room.status != RoomStatus.live) {
+                          final msg = switch (room.status) {
+                            RoomStatus.active =>
+                              'Room is not live yet. Waiting for the host to start.',
+                            RoomStatus.inactive =>
+                              'This room has been disabled by admin.',
+                            RoomStatus.ended => 'This room has ended.',
+                            RoomStatus.live => '', // unreachable
+                          };
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text(msg)));
+                          return;
+                        }
+
+                        context.push('/room/${room.roomId}');
+                      },
                     ),
-                    data: (rooms) {
-                      if (rooms.isEmpty) {
-                        return const SliverFillRemaining(
-                          child: Center(
-                            child: Text(
-                              'No rooms yet',
-                              style: TextStyle(color: AppColors.textSecondary),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        );
-                      }
-                      return SliverPadding(
-                        padding: const EdgeInsets.all(16),
-                        sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, i) => RoomCard(
-                              room: rooms[i],
-                              animationIndex: i,
-                              onTap: () {
-                                final room = rooms[i];
-                                final activeCall = ref.read(activeCallProvider);
-                                final activeSession = ref.read(roomSessionProvider).value;
-                                if (activeCall != null &&
-                                    activeSession != null &&
-                                    activeSession.isInCall &&
-                                    activeSession.roomId != room.roomId) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'You are already in "${activeSession.roomName}". Leave it first.',
-                                      ),
-                                      action: SnackBarAction(
-                                        label: 'Go back',
-                                        onPressed: () {
-                                          context.push('/room/${activeSession.roomId}');
-                                        },
-                                      ),
-                                    ),
-                                  );
-                                  return;
-                                }
-
-                                // Block normal users from entering non-live rooms
-                                if (user?.role == UserRole.user && room.status != RoomStatus.live) {
-                                  final msg = switch (room.status) {
-                                    RoomStatus.active => 'Room is not live yet. Waiting for the host to start.',
-                                    RoomStatus.inactive => 'This room has been disabled by admin.',
-                                    RoomStatus.ended => 'This room has ended.',
-                                    RoomStatus.live => '', // unreachable
-                                  };
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text(msg)),
-                                  );
-                                  return;
-                                }
-
-                                context.push('/room/${room.roomId}');
-                              },
-                            ),
-                            childCount: rooms.length,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                  );
+                },
               ),
             ),
           ],

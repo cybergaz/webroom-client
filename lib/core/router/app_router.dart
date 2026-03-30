@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:webroom_client/features/home/screens/home_screen.dart';
+import 'package:webroom_client/features/home/screens/profile_screen.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/signup_screen.dart';
 import '../../features/auth/screens/signup_success_screen.dart';
@@ -21,8 +23,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     '/splash',
   ];
 
+  // Bridge Riverpod auth state changes → GoRouter refreshes
+  final authListenable = ValueNotifier<AuthState>(ref.read(authStateProvider));
+  ref.listen(authStateProvider, (_, next) {
+    authListenable.value = next;
+  });
+
   return GoRouter(
     initialLocation: '/splash',
+    refreshListenable: authListenable,
     redirect: (context, state) {
       final authState = ref.read(authStateProvider);
       final path = state.matchedLocation;
@@ -89,6 +98,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/home',
         name: 'home',
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        name: 'profile',
+        builder: (context, state) => const ProfileScreen(),
       ),
       GoRoute(
         path: '/room/:roomId',

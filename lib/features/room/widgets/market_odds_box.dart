@@ -15,7 +15,21 @@ class MarketOddsBox extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final oddsState = ref.watch(oddsProvider);
 
-    if (!oddsState.hasActiveOdds) return const SizedBox.shrink();
+    if (!oddsState.hasActiveOdds) {
+      if (oddsState.error != null) {
+        // Show error then clear it
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(oddsState.error!),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          ref.read(oddsProvider.notifier).clearError();
+        });
+      }
+      return const SizedBox.shrink();
+    }
 
     final odds = oddsState.odds!;
 
@@ -48,8 +62,10 @@ class MarketOddsBox extends ConsumerWidget {
                 ),
                 if (odds.inPlay)
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     margin: const EdgeInsets.only(right: 4),
                     decoration: BoxDecoration(
                       color: AppColors.success.withValues(alpha: 0.2),
@@ -83,9 +99,17 @@ class MarketOddsBox extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(
               children: [
-                const Expanded(child: SizedBox()),
+                Expanded(
+                  child: Text(
+                    'refreshing in ${oddsState.refreshCountdown}s',
+                    style: const TextStyle(
+                      color: AppColors.textHint,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
                 SizedBox(
-                  width: 144, // 3 cells x 48px
+                  width: 100, // 3 cells x 48px
                   child: Center(
                     child: Text(
                       'BACK',
@@ -98,7 +122,7 @@ class MarketOddsBox extends ConsumerWidget {
                   ),
                 ),
                 SizedBox(
-                  width: 144,
+                  width: 100,
                   child: Center(
                     child: Text(
                       'LAY',
@@ -139,21 +163,21 @@ class MarketOddsBox extends ConsumerWidget {
               name,
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),
           // Back: deepest -> best (best closest to center)
-          _cell(backs[2]?.price, _backColor, 0.15),
-          _cell(backs[1]?.price, _backColor, 0.22),
-          _cell(backs[0]?.price, _backColor, 0.32),
+          // _cell(backs[2]?.price, _backColor, 0.15),
+          // _cell(backs[1]?.price, _backColor, 0.22),
+          _cell(backs[0]?.price, backs[0]?.size, _backColor, 0.32),
           // Lay: best -> deepest (best closest to center)
-          _cell(lays[0]?.price, _layColor, 0.32),
-          _cell(lays[1]?.price, _layColor, 0.22),
-          _cell(lays[2]?.price, _layColor, 0.15),
+          _cell(lays[0]?.price, backs[0]?.size, _layColor, 0.32),
+          // _cell(lays[1]?.price, _layColor, 0.22),
+          // _cell(lays[2]?.price, _layColor, 0.15),
         ],
       ),
     );
@@ -163,23 +187,39 @@ class MarketOddsBox extends ConsumerWidget {
     return List.generate(count, (i) => i < list.length ? list[i] : null);
   }
 
-  Widget _cell(double? price, Color color, double opacity) {
+  Widget _cell(double? price, double? size, Color color, double opacity) {
     return Container(
-      width: 46,
-      height: 28,
+      width: 100,
+      height: 50,
       margin: const EdgeInsets.symmetric(horizontal: 1),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: opacity),
+        color: color,
         borderRadius: BorderRadius.circular(4),
       ),
       alignment: Alignment.center,
-      child: Text(
-        price != null ? price.toStringAsFixed(2) : '-',
-        style: TextStyle(
-          color: price != null ? AppColors.textPrimary : AppColors.textHint,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            price != null ? price.toStringAsFixed(2) : '-',
+            style: TextStyle(
+              color: price != null ? AppColors.background : AppColors.textHint,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          Text(
+            size != null ? size.toStringAsFixed(2) : '-',
+            style: TextStyle(
+              color: price != null
+                  ? AppColors.background.withAlpha(150)
+                  : AppColors.textHint,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }

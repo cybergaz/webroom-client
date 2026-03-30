@@ -40,6 +40,9 @@ class AuthRepositoryImpl implements AuthRepository {
     await _storage.write(StorageKeys.userId, user.userId);
     await _storage.write(StorageKeys.userRole, user.role.name);
     await _storage.write(StorageKeys.userStatus, user.status);
+    if (user.phone != null) await _storage.write(StorageKeys.userPhone, user.phone!);
+    if (user.email != null) await _storage.write(StorageKeys.userEmail, user.email!);
+    if (user.requestId != null) await _storage.write(StorageKeys.requestId, user.requestId!);
 
     return (user: user, accessToken: accessToken, refreshToken: refreshToken, getstreamToken: getstreamToken);
   }

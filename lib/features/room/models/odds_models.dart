@@ -5,10 +5,9 @@ class Competition {
   const Competition({required this.id, required this.name});
 
   factory Competition.fromJson(Map<String, dynamic> json) {
-    final comp = json['competition'] as Map<String, dynamic>;
     return Competition(
-      id: comp['id'] as String,
-      name: comp['name'] as String,
+      id: json['id'].toString(),
+      name: json['name'] as String,
     );
   }
 }
@@ -18,7 +17,11 @@ class SportEvent {
   final String name;
   final DateTime openDate;
 
-  const SportEvent({required this.id, required this.name, required this.openDate});
+  const SportEvent({
+    required this.id,
+    required this.name,
+    required this.openDate,
+  });
 
   factory SportEvent.fromJson(Map<String, dynamic> json) {
     return SportEvent(
@@ -28,7 +31,11 @@ class SportEvent {
     );
   }
 
-  bool get isExpired => openDate.isBefore(DateTime.now());
+  bool get isExpired {
+    final today = DateTime.now();
+    final startOfDay = DateTime(today.year, today.month, today.day);
+    return openDate.isBefore(startOfDay);
+  }
 }
 
 class RunnerInfo {
@@ -69,11 +76,13 @@ class RunnerOdds {
     return RunnerOdds(
       selectionId: json['selectionId'] as int,
       status: json['status'] as String? ?? 'ACTIVE',
-      back: (json['back'] as List<dynamic>?)
+      back:
+          (json['back'] as List<dynamic>?)
               ?.map((e) => PriceSize.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      lay: (json['lay'] as List<dynamic>?)
+      lay:
+          (json['lay'] as List<dynamic>?)
               ?.map((e) => PriceSize.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -99,7 +108,8 @@ class MarketOdds {
       marketId: json['marketId'] as String? ?? marketId,
       status: json['status'] as String? ?? 'UNKNOWN',
       inPlay: json['inPlay'] as bool? ?? false,
-      runners: (json['runners'] as List<dynamic>?)
+      runners:
+          (json['runners'] as List<dynamic>?)
               ?.map((e) => RunnerOdds.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],

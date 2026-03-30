@@ -59,8 +59,11 @@ class _OddsSelectionDialogState extends ConsumerState<OddsSelectionDialog> {
                       },
                       child: const Padding(
                         padding: EdgeInsets.only(right: 8),
-                        child: Icon(Icons.arrow_back,
-                            color: AppColors.textSecondary, size: 20),
+                        child: Icon(
+                          Icons.arrow_back,
+                          color: AppColors.textSecondary,
+                          size: 20,
+                        ),
                       ),
                     ),
                   Expanded(
@@ -78,7 +81,10 @@ class _OddsSelectionDialogState extends ConsumerState<OddsSelectionDialog> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                    icon: const Icon(
+                      Icons.close,
+                      color: AppColors.textSecondary,
+                    ),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -90,23 +96,32 @@ class _OddsSelectionDialogState extends ConsumerState<OddsSelectionDialog> {
               child: TextField(
                 controller: _searchController,
                 style: const TextStyle(
-                    color: AppColors.textPrimary, fontSize: 14),
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                ),
                 decoration: InputDecoration(
                   hintText: _viewingEvents
                       ? 'Search events...'
                       : 'Search competitions...',
-                  hintStyle:
-                      const TextStyle(color: AppColors.textHint, fontSize: 14),
-                  prefixIcon: const Icon(Icons.search,
-                      color: AppColors.textHint, size: 20),
+                  hintStyle: const TextStyle(
+                    color: AppColors.textHint,
+                    fontSize: 14,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: AppColors.textHint,
+                    size: 20,
+                  ),
                   filled: true,
                   fillColor: AppColors.background,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   isDense: true,
                 ),
                 onChanged: (value) =>
@@ -116,8 +131,10 @@ class _OddsSelectionDialogState extends ConsumerState<OddsSelectionDialog> {
             // Error
             if (oddsState.error != null)
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
                 child: Text(
                   oddsState.error!,
                   style: const TextStyle(color: AppColors.error, fontSize: 13),
@@ -141,15 +158,19 @@ class _OddsSelectionDialogState extends ConsumerState<OddsSelectionDialog> {
     }
 
     final filtered = oddsState.competitions
-        .where((c) =>
-            _searchQuery.isEmpty ||
-            c.name.toLowerCase().contains(_searchQuery))
+        .where(
+          (c) =>
+              _searchQuery.isEmpty ||
+              c.name.toLowerCase().contains(_searchQuery),
+        )
         .toList();
 
     if (filtered.isEmpty) {
       return const Center(
-        child: Text('No competitions found',
-            style: TextStyle(color: AppColors.textSecondary)),
+        child: Text(
+          'No competitions found',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
       );
     }
 
@@ -164,11 +185,13 @@ class _OddsSelectionDialogState extends ConsumerState<OddsSelectionDialog> {
           dense: true,
           title: Text(
             comp.name,
-            style:
-                const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
           ),
-          trailing: const Icon(Icons.chevron_right,
-              color: AppColors.textHint, size: 20),
+          trailing: const Icon(
+            Icons.chevron_right,
+            color: AppColors.textHint,
+            size: 20,
+          ),
           onTap: () {
             ref.read(oddsProvider.notifier).fetchEvents(comp.id, comp.name);
             setState(() {
@@ -188,15 +211,19 @@ class _OddsSelectionDialogState extends ConsumerState<OddsSelectionDialog> {
     }
 
     final filtered = oddsState.events
-        .where((e) =>
-            _searchQuery.isEmpty ||
-            e.name.toLowerCase().contains(_searchQuery))
+        .where(
+          (e) =>
+              _searchQuery.isEmpty ||
+              e.name.toLowerCase().contains(_searchQuery),
+        )
         .toList();
 
     if (filtered.isEmpty) {
       return const Center(
-        child: Text('No upcoming events',
-            style: TextStyle(color: AppColors.textSecondary)),
+        child: Text(
+          'No upcoming events',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
       );
     }
 
@@ -207,25 +234,28 @@ class _OddsSelectionDialogState extends ConsumerState<OddsSelectionDialog> {
           const Divider(color: AppColors.divider, height: 1),
       itemBuilder: (context, index) {
         final event = filtered[index];
+        final isLoadingThis = oddsState.loadingEventId == event.id;
         return ListTile(
           dense: true,
           title: Text(
             event.name,
-            style:
-                const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
           ),
           subtitle: Text(
             _formatDate(event.openDate),
             style: const TextStyle(color: AppColors.textHint, fontSize: 12),
           ),
-          trailing: oddsState.isLoadingMarket
+          trailing: isLoadingThis
               ? const SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Icon(Icons.chevron_right,
-                  color: AppColors.textHint, size: 20),
+              : const Icon(
+                  Icons.chevron_right,
+                  color: AppColors.textHint,
+                  size: 20,
+                ),
           onTap: oddsState.isLoadingMarket
               ? null
               : () async {
@@ -243,8 +273,18 @@ class _OddsSelectionDialogState extends ConsumerState<OddsSelectionDialog> {
 
   String _formatDate(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${date.day} ${months[date.month - 1]} ${date.year}, '
         '${date.hour.toString().padLeft(2, '0')}:'

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:stream_video/stream_video.dart';
@@ -370,6 +371,9 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
 
     print("entercall: chk 8");
 
+    // Keep screen awake during the session.
+    WakelockPlus.enable();
+
     state = AsyncData(
       (state.value ?? current).copyWith(
         getstreamCallId: getstreamCallId,
@@ -616,6 +620,8 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
     _callStateSub = null;
     _callEventsSub = null;
     _grantedPermissionUsers.clear();
+    // Allow screen to sleep again.
+    WakelockPlus.disable();
   }
 }
 

@@ -118,7 +118,7 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
               const Expanded(child: Center(child: CircularProgressIndicator()))
             else ...[
               // Participants area
-              Expanded(child: ParticipantsGrid(call: call)),
+              Expanded(child: ParticipantsGrid(call: call, excludeLocal: true)),
               // Custom controls
               _buildControls(call),
             ],

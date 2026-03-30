@@ -1,17 +1,19 @@
 import 'package:dio/dio.dart';
+import 'package:webroom_client/features/auth/providers/auth_provider.dart';
 import '../storage/secure_storage.dart';
 import '../constants/storage_keys.dart';
 
 class AuthInterceptor extends QueuedInterceptorsWrapper {
   final Dio _dio;
   final SecureStorageService _storage;
+  final Future<void> Function() _onForceLogout;
 
   /// When true, the refresh token is dead and the user must re-login.
-  /// The UI layer (e.g. auth provider) should check this.
   bool _refreshTokenDead = false;
   bool get isRefreshTokenDead => _refreshTokenDead;
 
-  AuthInterceptor(this._dio, this._storage);
+  AuthInterceptor(this._dio, this._storage, {required Future<void> Function() onForceLogout})
+      : _onForceLogout = onForceLogout;
 
   @override
   Future<void> onRequest(
@@ -74,6 +76,7 @@ class AuthInterceptor extends QueuedInterceptorsWrapper {
         print('Refresh token rejected (403) — clearing storage for re-login');
         _refreshTokenDead = true;
         await _storage.deleteAll();
+        await _onForceLogout();
       } else {
         print('Token refresh failed: ${e.response?.statusCode} ${e.message}');
       }
@@ -89,7 +92,19 @@ class AuthInterceptor extends QueuedInterceptorsWrapper {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
+    print("-----------------------------------------------------------");
+    print("err : ${err.toString()}");
+    print("-----------------------------------------------------------");
+
+    print("-----------------------------------------------------------");
+    print("statusCode : ${err.response?.statusCode}");
+    print("-----------------------------------------------------------");
+
+    print("-----------------------------------------------------------");
+    print("_refreshTokenDead : ${_refreshTokenDead}");
+    print("-----------------------------------------------------------");
     if (err.response?.statusCode == 401 && !_refreshTokenDead) {
+      print('we are going to refresh');
       final newToken = await _tryRefresh();
       if (newToken != null) {
         // Retry the original request with the fresh token
