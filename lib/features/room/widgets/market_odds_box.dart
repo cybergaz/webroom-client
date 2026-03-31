@@ -60,7 +60,7 @@ class MarketOddsBox extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (odds.inPlay)
+                if (oddsState.lastFetchTime != null)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 6,
@@ -71,11 +71,13 @@ class MarketOddsBox extends ConsumerWidget {
                       color: AppColors.success.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text(
-                      'LIVE',
-                      style: TextStyle(
+                    alignment: Alignment.center,
+                    width: 80,
+                    child: Text(
+                      oddsState.lastFetchTime!,
+                      style: const TextStyle(
                         color: AppColors.success,
-                        fontSize: 9,
+                        fontSize: 10,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -99,15 +101,7 @@ class MarketOddsBox extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(
               children: [
-                Expanded(
-                  child: Text(
-                    'refreshing in ${oddsState.refreshCountdown}s',
-                    style: const TextStyle(
-                      color: AppColors.textHint,
-                      fontSize: 10,
-                    ),
-                  ),
-                ),
+                const Expanded(child: SizedBox.shrink()),
                 SizedBox(
                   width: 100, // 3 cells x 48px
                   child: Center(
@@ -163,11 +157,11 @@ class MarketOddsBox extends ConsumerWidget {
               name,
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              // maxLines: 1,
+              // overflow: TextOverflow.ellipsis,
             ),
           ),
           // Back: deepest -> best (best closest to center)
@@ -204,13 +198,13 @@ class MarketOddsBox extends ConsumerWidget {
             price != null ? price.toStringAsFixed(2) : '-',
             style: TextStyle(
               color: price != null ? AppColors.background : AppColors.textHint,
-              fontSize: 12,
+              fontSize: 15,
               fontWeight: FontWeight.bold,
             ),
           ),
 
           Text(
-            size != null ? size.toStringAsFixed(2) : '-',
+            size != null ? '\$${size.toInt().toString()}' : '-',
             style: TextStyle(
               color: price != null
                   ? AppColors.background.withAlpha(150)
