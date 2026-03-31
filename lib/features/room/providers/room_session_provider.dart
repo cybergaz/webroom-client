@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -39,7 +40,9 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
   StreamSubscription? _wsSub;
   StreamSubscription? _callStateSub;
   StreamSubscription? _callEventsSub;
+  StreamSubscription? _callConnectionSub;
   String? _roomId;
+  bool _isLeaving = false;
   final Set<String> _grantedPermissionUsers = {};
 
   @override
@@ -56,6 +59,18 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
 
   /// Fetches room details. Auto-enters the call if the room is live and this user is the host.
   Future<void> loadRoom(String roomId) async {
+    // If there's already an active call session for this room, skip the
+    // entire join flow.  This prevents duplicate joins when the user
+    // navigates back and then re-opens the same room.
+    final existingCall = ref.read(activeCallProvider);
+    final existingSession = state.value;
+    if (existingCall != null &&
+        existingSession != null &&
+        existingSession.roomId == roomId &&
+        existingSession.isInCall) {
+      return;
+    }
+
     _roomId = roomId;
     state = const AsyncLoading();
 
@@ -295,9 +310,7 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
     print("-----------------------------------------------------------");
 
     if (!call_stat.isSuccess) {
-      throw Exception(
-        'GetStream coordinator not connected: $call_stat',
-      );
+      throw Exception('GetStream coordinator not connected: $call_stat');
     }
 
     final call = StreamVideo.instance.makeCall(
@@ -328,12 +341,21 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
 
     print("entercall: chk 4");
 
+    // If this call was already joined (e.g. stale state from a previous
+    // session), leave first so the SFU clears old publisher tracks.
+    if (call.state.value.status.isAlreadyJoined) {
+      print("stale call detected — leaving before rejoin");
+      await call.leave();
+    }
+
+    // Host joins with mic on; users join muted (PTT mode).
+    final micEnabled = userRole == UserRole.host;
     final connectOptions = CallConnectOptions(
-      microphone: TrackOption.enabled(),
+      microphone: micEnabled ? TrackOption.enabled() : TrackOption.disabled(),
     );
-    await call.join(connectOptions: connectOptions).timeout(
-      const Duration(seconds: 15),
-    );
+    await call
+        .join(connectOptions: connectOptions)
+        .timeout(const Duration(seconds: 15));
 
     print("entercall: chk 5");
     print("-----------------------------------------------------------");
@@ -357,7 +379,7 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
       } catch (e) {
         print("hostReady call failed (non-fatal): $e");
       }
-    } else {}
+    }
 
     print("entercall: chk 6");
 
@@ -469,7 +491,8 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
     });
   }
 
-  /// Listens to GetStream SDK call events (e.g. call ended by host).
+  /// Listens to GetStream SDK call events (e.g. call ended by host)
+  /// and monitors the SFU connection for silent drops.
   void _subscribeToCallEvents(Call call) {
     _callEventsSub?.cancel();
     _callEventsSub = call.callEvents.listen((event) {
@@ -483,15 +506,36 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
         state = AsyncData(current.copyWith(isEnded: true, isInCall: false));
       }
     });
+
+    // Monitor call connection status to detect silent SFU drops
+    // (e.g. host sitting alone and the SFU times out).
+    _callConnectionSub?.cancel();
+    _callConnectionSub = call.state.valueStream
+        .map((s) => s.status)
+        .distinct()
+        .listen((status) {
+      print("-----------------------------------------------------------");
+      print("call connection status changed: $status");
+      print("-----------------------------------------------------------");
+      if (status.isDisconnected || status.isIdle) {
+        // Ignore disconnects triggered by our own leave/end actions.
+        if (_isLeaving) return;
+
+        final current = state.value;
+        if (current == null || !current.isInCall) return;
+
+        print("call connection lost unexpectedly — marking session ended");
+        call.leave().catchError((_) {});
+        ref.read(activeCallProvider.notifier).setCall(null);
+        state = AsyncData(current.copyWith(isEnded: true, isInCall: false));
+      }
+    });
   }
 
   void _subscribeToWsEvents(String roomId) {
     _wsSub?.cancel();
     final wsService = ref.read(websocketServiceProvider);
     _wsSub = wsService.events.listen((event) async {
-      print("-----------------------------------------------------------");
-      print("event : ${event.toString()}");
-      print("-----------------------------------------------------------");
       final eventName = event['event'] as String;
       final payload = event['payload'] as Map<String, dynamic>? ?? {};
 
@@ -548,23 +592,27 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
 
         case 'room.host_disconnected':
           final graceSeconds = payload['gracePeriodSeconds'] as num? ?? 30;
-          state = AsyncData(current.copyWith(
-            isHostDisconnected: true,
-            hostGraceSeconds: graceSeconds.toInt(),
-          ));
+          state = AsyncData(
+            current.copyWith(
+              isHostDisconnected: true,
+              hostGraceSeconds: graceSeconds.toInt(),
+            ),
+          );
 
         case 'room.host_reconnected':
-          state = AsyncData(current.copyWith(
-            isHostDisconnected: false,
-            hostGraceSeconds: 0,
-          ));
+          state = AsyncData(
+            current.copyWith(isHostDisconnected: false, hostGraceSeconds: 0),
+          );
       }
     });
   }
 
   Future<void> leaveRoom() async {
+    _isLeaving = true;
     final call = ref.read(activeCallProvider);
     if (call != null) {
+      // Disable mic before leaving to ensure audio track is properly released.
+      await call.setMicrophoneEnabled(enabled: false).catchError((_) {});
       await call.leave();
       ref.read(activeCallProvider.notifier).setCall(null);
     }
@@ -578,6 +626,7 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
   }
 
   Future<void> endRoom() async {
+    _isLeaving = true;
     final call = ref.read(activeCallProvider);
     if (call != null) {
       await call.stopLive();
@@ -586,7 +635,18 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
     }
     final roomId = _roomId;
     if (roomId != null) {
-      await _repo().endRoom(roomId);
+      try {
+        await _repo().endRoom(roomId);
+      } on DioException catch (e) {
+        // 409 means room is already not live — treat as successful end
+        print("-----------------------------------------------------------");
+        print("statusCode : ${e.response?.statusCode}");
+        print("-----------------------------------------------------------");
+        if (e.response?.statusCode == 409) {
+          _cleanup();
+        }
+        ;
+      }
     }
     _cleanup();
   }
@@ -616,9 +676,12 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
     _wsSub?.cancel();
     _callStateSub?.cancel();
     _callEventsSub?.cancel();
+    _callConnectionSub?.cancel();
     _wsSub = null;
     _callStateSub = null;
     _callEventsSub = null;
+    _callConnectionSub = null;
+    _isLeaving = false;
     _grantedPermissionUsers.clear();
     // Allow screen to sleep again.
     WakelockPlus.disable();
