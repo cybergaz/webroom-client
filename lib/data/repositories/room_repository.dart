@@ -11,6 +11,7 @@ abstract class RoomRepository {
       String getstreamToken,
       String getstreamCallType,
       List<dynamic> allMembers,
+      String? sessionId,
     })
   >
   getRoom(String roomId);

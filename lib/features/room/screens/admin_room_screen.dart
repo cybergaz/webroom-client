@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:stream_video/stream_video.dart';
 
 import '../providers/getstream_provider.dart';
+import '../providers/host_recording_provider.dart';
 import '../providers/odds_provider.dart';
 import '../providers/room_session_provider.dart';
 import '../widgets/call_controls_bar.dart';
@@ -138,8 +139,18 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
           call: call,
           isHost: true,
           isMuted: isMuted,
-          onMuteToggle: () => call.setMicrophoneEnabled(enabled: isMuted),
+          onMuteToggle: () async {
+            final willUnmute = isMuted;
+            await call.setMicrophoneEnabled(enabled: willUnmute);
+            if (willUnmute) {
+              ref.read(hostRecordingProvider.notifier).onUnmute();
+            } else {
+              ref.read(hostRecordingProvider.notifier).onMute();
+            }
+          },
           onEndOrLeave: () async {
+            // Stop host recording before ending
+            await ref.read(hostRecordingProvider.notifier).onMute();
             await call.setMicrophoneEnabled(enabled: false);
             await ref.read(roomSessionProvider.notifier).endRoom();
             if (context.mounted) context.go('/home');

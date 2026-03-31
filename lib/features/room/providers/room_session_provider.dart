@@ -28,6 +28,7 @@ abstract class RoomSession with _$RoomSession {
     required RoomStatus status,
     required List<RoomMemberModel> members,
     required String getstreamCallId,
+    String? sessionId,
     @Default(false) bool isInCall,
     @Default(false) bool isEnded,
     @Default(false) bool isHost,
@@ -93,6 +94,7 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
           status: RoomStatus.live,
           members: [],
           getstreamCallId: roomData.room.getstreamCallId,
+          sessionId: roomData.sessionId,
           isInCall: true,
           isHost: roomData.isHost,
         ),
@@ -114,6 +116,7 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
             status: RoomStatus.live,
             members: members,
             getstreamCallId: roomData.room.getstreamCallId,
+            sessionId: roomData.sessionId,
             isInCall: true,
             isHost: true,
           ),
@@ -161,10 +164,11 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
       print("chk 3");
       final callId =
           data['getstreamCallId'] as String? ?? current.getstreamCallId;
+      final sessionId = data['sessionId'] as String?;
 
       print("chk 4");
       state = AsyncData(
-        current.copyWith(status: RoomStatus.live, getstreamCallId: callId),
+        current.copyWith(status: RoomStatus.live, getstreamCallId: callId, sessionId: sessionId),
       );
       print("chk 5");
 

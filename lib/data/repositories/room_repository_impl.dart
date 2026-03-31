@@ -37,6 +37,7 @@ class RoomRepositoryImpl implements RoomRepository {
       String getstreamToken,
       String getstreamCallType,
       List<dynamic> allMembers,
+      String? sessionId,
     })
   >
   getRoom(String roomId) async {
@@ -50,12 +51,14 @@ class RoomRepositoryImpl implements RoomRepository {
     final getstreamCallType =
         data['getstreamCallType'] as String? ?? 'audio_room';
     final allMembers = data['allMembers'] as List<dynamic>? ?? [];
+    final sessionId = data['sessionId'] as String?;
     return (
       room: room,
       isHost: isHost,
       getstreamToken: getstreamToken,
       getstreamCallType: getstreamCallType,
       allMembers: allMembers,
+      sessionId: sessionId,
     );
   }
 
