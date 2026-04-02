@@ -186,8 +186,17 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
     if (current == null || _roomId == null) return;
 
     try {
+      final data = await _repo().joinRoom(_roomId!);
+      final callId =
+          data['getstreamCallId'] as String? ?? current.getstreamCallId;
+      final sessionId = data['sessionId'] as String?;
+
+      state = AsyncData(
+        current.copyWith(getstreamCallId: callId, sessionId: sessionId),
+      );
+
       await _enterCall(
-        getstreamCallId: current.getstreamCallId,
+        getstreamCallId: callId,
         roomId: _roomId!,
       );
     } catch (e, st) {
@@ -509,11 +518,25 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
         ref.read(activeCallProvider.notifier).setCall(null);
         state = AsyncData(current.copyWith(isEnded: true, isInCall: false));
       }
+
+      // Forward closed caption events to backend for admin live transcription view
+      if (event is StreamCallClosedCaptionsEvent) {
+        final wsService = ref.read(websocketServiceProvider);
+        wsService.send('transcription.caption', {
+          'roomId': _roomId,
+          'text': event.text,
+          'startTime': event.startTime.toIso8601String(),
+          'endTime': event.endTime.toIso8601String(),
+        });
+      }
     });
 
     // Monitor call connection status to detect silent SFU drops
     // (e.g. host sitting alone and the SFU times out).
+    // Skip the initial Idle status that fires before the SFU connection
+    // is established — only react to Disconnected after we've been connected.
     _callConnectionSub?.cancel();
+    var hasBeenConnected = false;
     _callConnectionSub = call.state.valueStream
         .map((s) => s.status)
         .distinct()
@@ -521,7 +544,17 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
       print("-----------------------------------------------------------");
       print("call connection status changed: $status");
       print("-----------------------------------------------------------");
-      if (status.isDisconnected || status.isIdle) {
+
+      // Track when the connection has been established at least once.
+      if (status.isConnected || status.isReconnecting) {
+        hasBeenConnected = true;
+        return;
+      }
+
+      // Only treat as unexpected drop if we were previously connected.
+      if (!hasBeenConnected) return;
+
+      if (status.isDisconnected) {
         // Ignore disconnects triggered by our own leave/end actions.
         if (_isLeaving) return;
 
