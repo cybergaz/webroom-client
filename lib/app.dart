@@ -5,6 +5,7 @@ import 'core/theme/app_theme.dart';
 import 'core/network/dio_client.dart';
 import 'core/network/websocket_service.dart';
 import 'features/auth/providers/auth_provider.dart';
+import 'features/auth/providers/session_guard_provider.dart';
 import 'features/room/widgets/active_call_overlay.dart';
 
 class WebroomApp extends ConsumerWidget {
@@ -13,6 +14,8 @@ class WebroomApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
+    // Activate the global session guard (handles force logout / session replaced)
+    ref.watch(sessionGuardProvider);
     // Connect/disconnect WS based on auth state
     ref.listen<AuthState>(authStateProvider, (prev, next) {
       switch (next) {

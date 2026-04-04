@@ -17,8 +17,9 @@ String mapErrorToMessage(Object error) {
         final statusCode = error.response?.statusCode;
         final data = error.response?.data;
         // Try to extract server message
-        if (data is Map<String, dynamic> && data['message'] != null) {
-          return data['message'] as String;
+        if (data is Map<String, dynamic>) {
+          if (data['error'] != null) return data['error'] as String;
+          if (data['message'] != null) return data['message'] as String;
         }
         return switch (statusCode) {
           400 => 'Invalid request. Please check your input.',

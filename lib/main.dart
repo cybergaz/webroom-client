@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/storage/local_storage.dart';
+import 'core/storage/secure_storage.dart';
 import 'core/network/dio_client.dart';
 import 'app.dart';
 
@@ -10,6 +11,8 @@ void main() async {
 
   final prefs = await SharedPreferences.getInstance();
   await initAppVersion();
+  await initDeviceName();
+  await initDeviceId(SecureStorageService());
 
   runApp(
     ProviderScope(
