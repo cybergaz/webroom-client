@@ -38,6 +38,11 @@ class HomeScreen extends ConsumerWidget {
         title: _AppBarTitle(name: user?.name, role: user?.role),
         actions: [
           IconButton(
+            icon: const Icon(Icons.mic_external_on_rounded),
+            tooltip: 'My Recordings',
+            onPressed: () => context.push('/recordings'),
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh',
             onPressed: () =>
