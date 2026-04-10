@@ -3,7 +3,7 @@ import 'package:stream_video/stream_video.dart';
 
 import '../../../core/theme/app_colors.dart';
 
-class ParticipantsGrid extends StatelessWidget {
+class ParticipantsGrid extends StatefulWidget {
   final Call call;
   final bool hostOnly;
   final bool excludeLocal;
@@ -16,25 +16,58 @@ class ParticipantsGrid extends StatelessWidget {
   });
 
   @override
+  State<ParticipantsGrid> createState() => _ParticipantsGridState();
+}
+
+class _ParticipantsGridState extends State<ParticipantsGrid> {
+  // userId → when they last started speaking
+  final Map<String, DateTime> _lastSpokeAt = {};
+
+  void _updateSpeakingTimes(List<CallParticipantState> participants) {
+    final now = DateTime.now();
+    for (final p in participants) {
+      if (p.isSpeaking) {
+        _lastSpokeAt[p.userId] = now;
+      }
+    }
+  }
+
+  List<CallParticipantState> _sorted(List<CallParticipantState> participants) {
+    final list = [...participants];
+    list.sort((a, b) {
+      final aTime = _lastSpokeAt[a.userId];
+      final bTime = _lastSpokeAt[b.userId];
+      if (aTime != null && bTime != null) return bTime.compareTo(aTime);
+      if (aTime != null) return -1;
+      if (bTime != null) return 1;
+      return a.name.compareTo(b.name);
+    });
+    return list;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return StreamBuilder<CallState>(
-      stream: call.state.valueStream,
-      initialData: call.state.valueOrNull,
+      stream: widget.call.state.valueStream,
+      initialData: widget.call.state.valueOrNull,
       builder: (context, snapshot) {
         var participants = snapshot.data?.callParticipants ?? [];
-        if (hostOnly) {
+        if (widget.hostOnly) {
           participants = participants
               .where((p) => p.roles.contains('host'))
               .toList();
         }
-        if (excludeLocal) {
+        if (widget.excludeLocal) {
           participants = participants.where((p) => !p.isLocal).toList();
         }
+
+        _updateSpeakingTimes(participants);
+        participants = _sorted(participants);
 
         if (participants.isEmpty) {
           return Center(
             child: Text(
-              excludeLocal
+              widget.excludeLocal
                   ? "You're the only one here"
                   : 'Waiting for participants...',
               style: const TextStyle(color: AppColors.textSecondary),
@@ -42,7 +75,7 @@ class ParticipantsGrid extends StatelessWidget {
           );
         }
 
-        if (hostOnly) {
+        if (widget.hostOnly) {
           if (participants.length == 1) {
             return _FullScreenParticipantTile(participant: participants.first);
           }
