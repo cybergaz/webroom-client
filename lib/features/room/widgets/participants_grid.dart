@@ -8,7 +8,12 @@ class ParticipantsGrid extends StatelessWidget {
   final bool hostOnly;
   final bool excludeLocal;
 
-  const ParticipantsGrid({super.key, required this.call, this.hostOnly = false, this.excludeLocal = false});
+  const ParticipantsGrid({
+    super.key,
+    required this.call,
+    this.hostOnly = false,
+    this.excludeLocal = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -23,15 +28,15 @@ class ParticipantsGrid extends StatelessWidget {
               .toList();
         }
         if (excludeLocal) {
-          participants = participants
-              .where((p) => !p.isLocal)
-              .toList();
+          participants = participants.where((p) => !p.isLocal).toList();
         }
 
         if (participants.isEmpty) {
           return Center(
             child: Text(
-              excludeLocal ? "You're the only one here" : 'Waiting for participants...',
+              excludeLocal
+                  ? "You're the only one here"
+                  : 'Waiting for participants...',
               style: const TextStyle(color: AppColors.textSecondary),
             ),
           );
@@ -71,10 +76,18 @@ class ParticipantsGrid extends StatelessWidget {
             final crossAxisCount = width < 400
                 ? 3
                 : width < 600
-                    ? 4
-                    : width < 900
-                        ? 5
-                        : (width ~/ 140).clamp(6, 10);
+                ? 4
+                : width < 900
+                ? 5
+                : (width ~/ 140).clamp(6, 10);
+
+            final aspectRatio = width < 400
+                ? 0.9
+                : width < 600
+                ? 0.8
+                : width < 900
+                ? 1.0
+                : 1.8;
 
             return GridView.builder(
               padding: const EdgeInsets.all(8),
@@ -82,7 +95,7 @@ class ParticipantsGrid extends StatelessWidget {
                 crossAxisCount: crossAxisCount,
                 mainAxisSpacing: 8,
                 crossAxisSpacing: 8,
-                childAspectRatio: 0.85,
+                childAspectRatio: aspectRatio,
               ),
               itemCount: participants.length,
               itemBuilder: (context, i) =>
@@ -102,76 +115,56 @@ class _FullScreenParticipantTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name =
-        participant.name.isNotEmpty ? participant.name : participant.userId;
+    final name = participant.name.isNotEmpty
+        ? participant.name
+        : participant.userId;
     final speaking = participant.isSpeaking;
 
     return AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.all(24),
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: speaking ? AppColors.success : AppColors.cardBorder,
-            width: speaking ? 3 : 1,
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.all(24),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: speaking ? AppColors.success : AppColors.cardBorder,
+          width: speaking ? 3 : 1,
+        ),
+        boxShadow: speaking
+            ? [
+                BoxShadow(
+                  color: AppColors.success.withValues(alpha: 0.3),
+                  blurRadius: 16,
+                  spreadRadius: 2,
+                ),
+              ]
+            : null,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            name,
+            style: TextStyle(
+              color: speaking ? AppColors.success : AppColors.textPrimary,
+              fontSize: 36,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
           ),
-          boxShadow: speaking
-              ? [
-                  BoxShadow(
-                    color: AppColors.success.withValues(alpha: 0.3),
-                    blurRadius: 16,
-                    spreadRadius: 2,
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              radius: 64,
-              backgroundColor: speaking
-                  ? AppColors.success.withValues(alpha: 0.2)
-                  : AppColors.accent.withValues(alpha: 0.2),
-              backgroundImage:
-                  participant.image != null && participant.image!.isNotEmpty
-                      ? NetworkImage(participant.image!)
-                      : null,
-              child: participant.image == null || participant.image!.isEmpty
-                  ? Text(
-                      name[0].toUpperCase(),
-                      style: TextStyle(
-                        color: speaking ? AppColors.success : AppColors.accent,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 48,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              name,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 22,
-                fontWeight: FontWeight.w600,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Icon(
-              participant.isAudioEnabled ? Icons.mic : Icons.mic_off,
-              size: 28,
-              color: participant.isAudioEnabled
-                  ? AppColors.accent
-                  : AppColors.textHint,
-            ),
-          ],
-        ),
+          const SizedBox(height: 12),
+          Icon(
+            participant.isAudioEnabled ? Icons.mic : Icons.mic_off,
+            size: 28,
+            color: participant.isAudioEnabled
+                ? AppColors.accent
+                : AppColors.textHint,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -183,8 +176,9 @@ class _ParticipantTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name =
-        participant.name.isNotEmpty ? participant.name : participant.userId;
+    final name = participant.name.isNotEmpty
+        ? participant.name
+        : participant.userId;
     final speaking = participant.isSpeaking;
 
     return AnimatedContainer(
@@ -209,44 +203,24 @@ class _ParticipantTile extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor:
-                speaking ? AppColors.success.withValues(alpha: 0.2) : AppColors.accent.withValues(alpha: 0.2),
-            backgroundImage:
-                participant.image != null && participant.image!.isNotEmpty
-                    ? NetworkImage(participant.image!)
-                    : null,
-            child: participant.image == null || participant.image!.isEmpty
-                ? Text(
-                    name[0].toUpperCase(),
-                    style: TextStyle(
-                      color: speaking ? AppColors.success : AppColors.accent,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 18,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(height: 6),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Text(
               name,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+              style: TextStyle(
+                color: speaking ? AppColors.success : AppColors.textPrimary,
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
               ),
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 6),
           Icon(
             participant.isAudioEnabled ? Icons.mic : Icons.mic_off,
-            size: 16,
+            size: 18,
             color: participant.isAudioEnabled
                 ? AppColors.accent
                 : AppColors.textHint,

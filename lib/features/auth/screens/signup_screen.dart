@@ -74,54 +74,49 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 16),
-                const Text(
-                  'Join Webroom',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1),
-                const SizedBox(height: 8),
-                const Text(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Join Webroom',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1),
+                    const SizedBox(height: 8),
+                    const Text(
                       'Request access to audio rooms',
                       style: TextStyle(color: AppColors.textSecondary),
-                    )
-                    .animate()
-                    .fadeIn(delay: 80.ms, duration: 300.ms)
-                    .slideY(begin: 0.1),
-                const SizedBox(height: 32),
-                TextFormField(
+                    ).animate().fadeIn(delay: 80.ms, duration: 300.ms).slideY(begin: 0.1),
+                    const SizedBox(height: 32),
+                    TextFormField(
                       controller: _nameController,
                       style: const TextStyle(color: AppColors.textPrimary),
                       decoration: const InputDecoration(labelText: 'Full Name'),
                       validator: Validators.name,
-                    )
-                    .animate()
-                    .fadeIn(delay: 160.ms, duration: 300.ms)
-                    .slideY(begin: 0.1),
-                const SizedBox(height: 16),
-                PhoneInputField(
+                    ).animate().fadeIn(delay: 160.ms, duration: 300.ms).slideY(begin: 0.1),
+                    const SizedBox(height: 16),
+                    PhoneInputField(
                       onChanged: (v) => _phone = v,
-                    )
-                    .animate()
-                    .fadeIn(delay: 240.ms, duration: 300.ms)
-                    .slideY(begin: 0.1),
-                const SizedBox(height: 4),
-                const Text(
-                  'Provide at least a phone number or email',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                ).animate().fadeIn(delay: 240.ms, duration: 300.ms),
-                const SizedBox(height: 16),
-                TextFormField(
+                    ).animate().fadeIn(delay: 240.ms, duration: 300.ms).slideY(begin: 0.1),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Provide at least a phone number or email',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    ).animate().fadeIn(delay: 240.ms, duration: 300.ms),
+                    const SizedBox(height: 16),
+                    TextFormField(
                       controller: _emailController,
                       style: const TextStyle(color: AppColors.textPrimary),
                       decoration: const InputDecoration(
@@ -130,12 +125,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       ),
                       keyboardType: TextInputType.emailAddress,
                       validator: Validators.email,
-                    )
-                    .animate()
-                    .fadeIn(delay: 320.ms, duration: 300.ms)
-                    .slideY(begin: 0.1),
-                const SizedBox(height: 16),
-                TextFormField(
+                    ).animate().fadeIn(delay: 320.ms, duration: 300.ms).slideY(begin: 0.1),
+                    const SizedBox(height: 16),
+                    TextFormField(
                       controller: _passwordController,
                       style: const TextStyle(color: AppColors.textPrimary),
                       obscureText: _obscurePassword,
@@ -150,44 +142,43 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                         ),
                       ),
                       validator: Validators.password,
-                    )
-                    .animate()
-                    .fadeIn(delay: 400.ms, duration: 300.ms)
-                    .slideY(begin: 0.1),
-                if (_error != null) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: AppColors.error.withValues(alpha: 0.3),
+                    ).animate().fadeIn(delay: 400.ms, duration: 300.ms).slideY(begin: 0.1),
+                    if (_error != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.error.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(color: AppColors.error),
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: AppColors.error),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 32),
-                AuthButton(
-                  label: 'Request Access',
-                  isLoading: _isLoading,
-                  onPressed: _submit,
-                ).animate().fadeIn(delay: 480.ms, duration: 300.ms),
-                const SizedBox(height: 16),
-                Center(
-                  child: TextButton(
-                    onPressed: () => context.push('/check-status'),
-                    child: const Text(
-                      'Already registered? Check status',
-                      style: TextStyle(color: AppColors.accent),
-                    ),
-                  ),
-                ).animate().fadeIn(delay: 560.ms, duration: 300.ms),
-              ],
+                    ],
+                    const SizedBox(height: 32),
+                    AuthButton(
+                      label: 'Request Access',
+                      isLoading: _isLoading,
+                      onPressed: _submit,
+                    ).animate().fadeIn(delay: 480.ms, duration: 300.ms),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => context.push('/check-status'),
+                        child: const Text(
+                          'Already registered? Check status',
+                          style: TextStyle(color: AppColors.accent),
+                        ),
+                      ),
+                    ).animate().fadeIn(delay: 560.ms, duration: 300.ms),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
