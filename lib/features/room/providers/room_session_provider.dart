@@ -45,6 +45,7 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
   String? _roomId;
   bool _isLeaving = false;
   final Set<String> _grantedPermissionUsers = {};
+  final Set<String> _pendingGrantUsers = {};
 
   @override
   Future<RoomSession> build() async {
@@ -453,25 +454,60 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
     });
   }
 
+  /// Grants sendAudio to [userId] with up to 2 retries.
+  /// Only marks the user as granted after a successful call.
+  /// Uses [_pendingGrantUsers] to prevent duplicate concurrent attempts.
+  Future<void> _grantPermissionWithRetry(Call call, String userId) async {
+    if (_pendingGrantUsers.contains(userId)) return;
+    _pendingGrantUsers.add(userId);
+
+    try {
+      for (var attempt = 0; attempt < 3; attempt++) {
+        try {
+          await call.grantPermissions(
+            userId: userId,
+            permissions: [CallPermission.sendAudio],
+          );
+          _grantedPermissionUsers.add(userId);
+          return;
+        } catch (e) {
+          print('grantPermissions attempt ${attempt + 1} failed for $userId: $e');
+          if (attempt < 2) {
+            await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
+          }
+        }
+      }
+      // All retries exhausted — don't add to granted set so it will be
+      // attempted again on the next call-state update.
+      print('grantPermissions exhausted retries for $userId');
+    } finally {
+      _pendingGrantUsers.remove(userId);
+    }
+  }
+
   void _subscribeToCallState(Call call) {
     _callStateSub?.cancel();
     _callStateSub = call.state.valueStream.listen((callState) {
       final current = state.value;
       if (current == null) return;
 
-      // Host auto-grants send-audio permission to new participants
+      // Host auto-grants send-audio permission to new participants.
+      // The server already grants on join, but this acts as a fallback
+      // in case the server grant didn't reach the SFU in time.
       if (current.isHost) {
+        // Track which users are currently in the call so we can
+        // remove departed users from the granted set.
+        final currentUserIds = <String>{};
         for (final p in callState.callParticipants) {
-          if (!p.isLocal && !_grantedPermissionUsers.contains(p.userId)) {
-            _grantedPermissionUsers.add(p.userId);
-            call
-                .grantPermissions(
-                  userId: p.userId,
-                  permissions: [CallPermission.sendAudio],
-                )
-                .catchError((_) {}); // fire-and-forget
+          if (p.isLocal) continue;
+          currentUserIds.add(p.userId);
+          if (!_grantedPermissionUsers.contains(p.userId)) {
+            // Don't mark as granted until the call actually succeeds.
+            _grantPermissionWithRetry(call, p.userId);
           }
         }
+        // Remove departed users so they get re-granted if they rejoin.
+        _grantedPermissionUsers.removeWhere((id) => !currentUserIds.contains(id));
       } else {
         // Non-host users should only hear the host, not other participants.
         // Disable audio tracks of non-host remote participants locally.
@@ -720,6 +756,7 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
     _callConnectionSub = null;
     _isLeaving = false;
     _grantedPermissionUsers.clear();
+    _pendingGrantUsers.clear();
     // Allow screen to sleep again.
     WakelockPlus.disable();
   }
