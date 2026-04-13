@@ -28,7 +28,24 @@ Future<void> initAppVersion() async {
 Future<void> initDeviceId(SecureStorageService storage) async {
   _deviceId = await storage.read(StorageKeys.deviceId);
   if (_deviceId == null) {
-    _deviceId = const Uuid().v4();
+    final deviceInfo = DeviceInfoPlugin();
+    final info = await deviceInfo.deviceInfo;
+
+    if (kIsWeb) {
+      final web = await deviceInfo.webBrowserInfo;
+      _deviceId = "${web.appCodeName}:${web.platform}";
+      await storage.write(StorageKeys.deviceId, _deviceId!);
+      return;
+    }
+
+    switch (info) {
+      case AndroidDeviceInfo():
+        _deviceId = "${info.model}:${info.id}";
+      default:
+        _deviceId = 'Unknown';
+    }
+    // // final deviceInfo = await deviceInfo.deviceInfo;
+    // _deviceId = const Uuid().v4();
     await storage.write(StorageKeys.deviceId, _deviceId!);
   }
 }

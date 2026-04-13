@@ -49,7 +49,7 @@ NIX_ENFORCE_NO_NATIVE='1'
 export NIX_ENFORCE_NO_NATIVE
 NIX_HARDENING_ENABLE='bindnow format fortify fortify3 libcxxhardeningextensive libcxxhardeningfast pic relro stackclashprotection stackprotector strictoverflow zerocallusedregs'
 export NIX_HARDENING_ENABLE
-NIX_LDFLAGS='-rpath /home/gaz/workspace/webroom/webroom_client/outputs/out/lib  -L/nix/store/ky8y8m3dgb9sf4w7sd5hqh15v5swhkz4-dart-3.11.0/lib -L/nix/store/ky8y8m3dgb9sf4w7sd5hqh15v5swhkz4-dart-3.11.0/lib'
+NIX_LDFLAGS='-rpath /home/gaz/workspace/webroom/webroom-client/outputs/out/lib  -L/nix/store/ky8y8m3dgb9sf4w7sd5hqh15v5swhkz4-dart-3.11.0/lib -L/nix/store/ky8y8m3dgb9sf4w7sd5hqh15v5swhkz4-dart-3.11.0/lib'
 export NIX_LDFLAGS
 NIX_NO_SELF_RPATH='1'
 NIX_PKG_CONFIG_WRAPPER_TARGET_TARGET_x86_64_unknown_linux_gnu='1'
@@ -146,7 +146,7 @@ name='flutter-dev-shell-env'
 export name
 nativeBuildInputs=''
 export nativeBuildInputs
-out='/home/gaz/workspace/webroom/webroom_client/outputs/out'
+out='/home/gaz/workspace/webroom/webroom-client/outputs/out'
 export out
 outputBin='out'
 outputDev='out'
@@ -177,7 +177,7 @@ preConfigurePhases=' updateAutotoolsGnuConfigScriptsPhase'
 declare -a preFixupHooks=('_moveToShare' '_multioutDocs' '_multioutDevs' )
 preferLocalBuild='1'
 export preferLocalBuild
-prefix='/home/gaz/workspace/webroom/webroom_client/outputs/out'
+prefix='/home/gaz/workspace/webroom/webroom-client/outputs/out'
 declare -a propagatedBuildDepFiles=('propagated-build-build-deps' 'propagated-native-build-inputs' 'propagated-build-target-deps' )
 propagatedBuildInputs=''
 export propagatedBuildInputs

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:stream_video/stream_video.dart';
 
@@ -22,14 +24,38 @@ class ParticipantsGrid extends StatefulWidget {
 class _ParticipantsGridState extends State<ParticipantsGrid> {
   // userId → when they last started speaking
   final Map<String, DateTime> _lastSpokeAt = {};
+  // userId → timer that clears the active glow 5 s after speaking stops
+  final Map<String, Timer> _speakingTimers = {};
+
+  static const _activeDuration = Duration(seconds: 6);
 
   void _updateSpeakingTimes(List<CallParticipantState> participants) {
     final now = DateTime.now();
     for (final p in participants) {
       if (p.isSpeaking) {
         _lastSpokeAt[p.userId] = now;
+        // Reset the 5-second cooldown timer each tick they are speaking.
+        _speakingTimers[p.userId]?.cancel();
+        _speakingTimers[p.userId] = Timer(_activeDuration, () {
+          if (mounted) setState(() {});
+        });
       }
     }
+  }
+
+  bool _isActive(CallParticipantState p) {
+    if (p.isSpeaking) return true;
+    final last = _lastSpokeAt[p.userId];
+    if (last == null) return false;
+    return DateTime.now().difference(last) < _activeDuration;
+  }
+
+  @override
+  void dispose() {
+    for (final t in _speakingTimers.values) {
+      t.cancel();
+    }
+    super.dispose();
   }
 
   List<CallParticipantState> _sorted(List<CallParticipantState> participants) {
@@ -77,7 +103,10 @@ class _ParticipantsGridState extends State<ParticipantsGrid> {
 
         if (widget.hostOnly) {
           if (participants.length == 1) {
-            return _FullScreenParticipantTile(participant: participants.first);
+            return _FullScreenParticipantTile(
+              participant: participants.first,
+              isActive: _isActive(participants.first),
+            );
           }
           return Center(
             child: Row(
@@ -90,7 +119,10 @@ class _ParticipantsGridState extends State<ParticipantsGrid> {
                     child: SizedBox(
                       width: 120,
                       height: 140,
-                      child: _ParticipantTile(participant: p),
+                      child: _ParticipantTile(
+                        participant: p,
+                        isActive: _isActive(p),
+                      ),
                     ),
                   ),
               ],
@@ -99,7 +131,10 @@ class _ParticipantsGridState extends State<ParticipantsGrid> {
         }
 
         if (participants.length == 1) {
-          return _FullScreenParticipantTile(participant: participants.first);
+          return _FullScreenParticipantTile(
+            participant: participants.first,
+            isActive: _isActive(participants.first),
+          );
         }
 
         return LayoutBuilder(
@@ -115,12 +150,12 @@ class _ParticipantsGridState extends State<ParticipantsGrid> {
                 : (width ~/ 140).clamp(6, 10);
 
             final aspectRatio = width < 400
-                ? 0.9
+                ? 0.85
                 : width < 600
-                ? 0.8
+                ? 0.7
                 : width < 900
-                ? 1.0
-                : 1.8;
+                ? 0.85
+                : 1.5;
 
             return GridView.builder(
               padding: const EdgeInsets.all(8),
@@ -131,8 +166,10 @@ class _ParticipantsGridState extends State<ParticipantsGrid> {
                 childAspectRatio: aspectRatio,
               ),
               itemCount: participants.length,
-              itemBuilder: (context, i) =>
-                  _ParticipantTile(participant: participants[i]),
+              itemBuilder: (context, i) => _ParticipantTile(
+                participant: participants[i],
+                isActive: _isActive(participants[i]),
+              ),
             );
           },
         );
@@ -143,15 +180,19 @@ class _ParticipantsGridState extends State<ParticipantsGrid> {
 
 class _FullScreenParticipantTile extends StatelessWidget {
   final CallParticipantState participant;
+  final bool isActive;
 
-  const _FullScreenParticipantTile({required this.participant});
+  const _FullScreenParticipantTile({
+    required this.participant,
+    required this.isActive,
+  });
 
   @override
   Widget build(BuildContext context) {
     final name = participant.name.isNotEmpty
         ? participant.name
         : participant.userId;
-    final speaking = participant.isSpeaking;
+    final speaking = isActive;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -204,15 +245,16 @@ class _FullScreenParticipantTile extends StatelessWidget {
 
 class _ParticipantTile extends StatelessWidget {
   final CallParticipantState participant;
+  final bool isActive;
 
-  const _ParticipantTile({required this.participant});
+  const _ParticipantTile({required this.participant, required this.isActive});
 
   @override
   Widget build(BuildContext context) {
     final name = participant.name.isNotEmpty
         ? participant.name
         : participant.userId;
-    final speaking = participant.isSpeaking;
+    final speaking = isActive;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -242,11 +284,11 @@ class _ParticipantTile extends StatelessWidget {
               name,
               style: TextStyle(
                 color: speaking ? AppColors.success : AppColors.textPrimary,
-                fontSize: 24,
+                fontSize: 20,
                 fontWeight: FontWeight.w600,
               ),
               maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+              overflow: TextOverflow.clip,
               textAlign: TextAlign.center,
             ),
           ),

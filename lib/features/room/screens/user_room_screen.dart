@@ -243,9 +243,12 @@ class _UserCallView extends ConsumerWidget {
         _BottomControls(
           call: call,
           onLeave: () async {
-            await ref.read(pttStateProvider.notifier).stopTransmitting();
-            await ref.read(roomSessionProvider.notifier).leaveRoom();
+            // Capture notifiers before navigation disposes the widget's ref
+            final ptt = ref.read(pttStateProvider.notifier);
+            final session = ref.read(roomSessionProvider.notifier);
             if (context.mounted) context.go('/home');
+            await ptt.stopTransmitting();
+            await session.leaveRoom();
           },
         ),
       ],

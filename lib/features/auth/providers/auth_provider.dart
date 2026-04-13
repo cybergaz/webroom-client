@@ -1,3 +1,5 @@
+import 'package:device_info_plus/device_info_plus.dart' show DeviceInfoPlugin;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../data/models/user_model.dart';
@@ -72,14 +74,18 @@ class AuthNotifier extends Notifier<AuthState> {
       // Wrapped in try/catch so a GetStream failure doesn't block auth.
       if (getstreamToken != null) {
         try {
-          await ref.read(getstreamStateProvider.notifier).init(
-            userId: userId,
-            userName: userName,
-            getstreamToken: getstreamToken,
-            role: role,
-          );
+          await ref
+              .read(getstreamStateProvider.notifier)
+              .init(
+                userId: userId,
+                userName: userName,
+                getstreamToken: getstreamToken,
+                role: role,
+              );
         } catch (e) {
-          print('StreamVideo init failed on restore, will retry on room entry: $e');
+          print(
+            'StreamVideo init failed on restore, will retry on room entry: $e',
+          );
         }
       }
       state = AuthState.authenticated(user: user);
@@ -111,13 +117,21 @@ class AuthNotifier extends Notifier<AuthState> {
     return requestId;
   }
 
-  Future<void> login({String? phone, String? email, required String password}) async {
+  Future<void> login({
+    String? phone,
+    String? email,
+    required String password,
+  }) async {
     state = const AuthState.loading();
     final repo = AuthRepositoryImpl(
       AuthRemoteDatasource(ref.read(dioClientProvider)),
       ref.read(secureStorageProvider),
     );
-    final result = await repo.login(phone: phone, email: email, password: password);
+    final result = await repo.login(
+      phone: phone,
+      email: email,
+      password: password,
+    );
 
     // Persist user name for StreamVideo re-init on next app launch
     await ref
@@ -125,12 +139,14 @@ class AuthNotifier extends Notifier<AuthState> {
         .write(StorageKeys.userName, result.user.name);
 
     // Initialize GetStream SDK for this user
-    await ref.read(getstreamStateProvider.notifier).init(
-      userId: result.user.userId,
-      userName: result.user.name,
-      getstreamToken: result.getstreamToken,
-      role: result.user.role,
-    );
+    await ref
+        .read(getstreamStateProvider.notifier)
+        .init(
+          userId: result.user.userId,
+          userName: result.user.name,
+          getstreamToken: result.getstreamToken,
+          role: result.user.role,
+        );
 
     state = AuthState.authenticated(user: result.user);
   }
