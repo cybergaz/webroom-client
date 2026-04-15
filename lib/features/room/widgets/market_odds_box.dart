@@ -197,7 +197,7 @@ class MarketOddsBox extends ConsumerWidget {
           Text(
             price != null ? price.toStringAsFixed(2) : '-',
             style: TextStyle(
-              color: price != null ? AppColors.background : AppColors.textHint,
+              color: price != null ? AppColors.textPrimary : AppColors.textHint,
               fontSize: 15,
               fontWeight: FontWeight.bold,
             ),
@@ -207,7 +207,7 @@ class MarketOddsBox extends ConsumerWidget {
             size != null ? '\$${size.toInt().toString()}' : '-',
             style: TextStyle(
               color: price != null
-                  ? AppColors.background.withAlpha(150)
+                  ? AppColors.textPrimary.withAlpha(150)
                   : AppColors.textHint,
               fontSize: 12,
               fontWeight: FontWeight.bold,

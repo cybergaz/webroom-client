@@ -16,21 +16,22 @@ class RecordingsState {
   final int total;
   final DateTime? fromDate;
   final DateTime? toDate;
+  final String? roomId;
 
   const RecordingsState({
     this.recordings = const [],
-    this.isLoading = true,
+    this.isLoading = false,
     this.isLoadingMore = false,
     this.error,
     this.currentPage = 0,
     this.total = 0,
     this.fromDate,
     this.toDate,
+    this.roomId,
   });
 
   bool get hasMore => recordings.length < total;
 
-  // Use getter functions for nullable fields so callers can explicitly set null
   RecordingsState copyWith({
     List<MyRecording>? recordings,
     bool? isLoading,
@@ -40,6 +41,7 @@ class RecordingsState {
     int? total,
     DateTime? Function()? fromDate,
     DateTime? Function()? toDate,
+    String? Function()? roomId,
   }) =>
       RecordingsState(
         recordings: recordings ?? this.recordings,
@@ -50,6 +52,7 @@ class RecordingsState {
         total: total ?? this.total,
         fromDate: fromDate == null ? this.fromDate : fromDate(),
         toDate: toDate == null ? this.toDate : toDate(),
+        roomId: roomId == null ? this.roomId : roomId(),
       );
 }
 
@@ -58,22 +61,26 @@ class RecordingsState {
 class RecordingsNotifier extends Notifier<RecordingsState> {
   @override
   RecordingsState build() {
-    Future.microtask(() => _fetch(page: 1));
     return const RecordingsState();
   }
 
+  Future<void> loadForRoom(String roomId) {
+    return _fetch(page: 1, roomId: roomId);
+  }
+
   Future<void> applyFilter({DateTime? from, DateTime? to}) {
-    return _fetch(page: 1, from: from, to: to);
+    return _fetch(page: 1, roomId: state.roomId, from: from, to: to);
   }
 
   Future<void> clearFilter() {
-    return _fetch(page: 1);
+    return _fetch(page: 1, roomId: state.roomId);
   }
 
   Future<void> loadMore() {
     if (state.isLoadingMore || !state.hasMore) return Future.value();
     return _fetch(
       page: state.currentPage + 1,
+      roomId: state.roomId,
       from: state.fromDate,
       to: state.toDate,
       append: true,
@@ -81,11 +88,17 @@ class RecordingsNotifier extends Notifier<RecordingsState> {
   }
 
   Future<void> refresh() {
-    return _fetch(page: 1, from: state.fromDate, to: state.toDate);
+    return _fetch(
+      page: 1,
+      roomId: state.roomId,
+      from: state.fromDate,
+      to: state.toDate,
+    );
   }
 
   Future<void> _fetch({
     required int page,
+    String? roomId,
     DateTime? from,
     DateTime? to,
     bool append = false,
@@ -95,17 +108,19 @@ class RecordingsNotifier extends Notifier<RecordingsState> {
         isLoading: true,
         fromDate: from,
         toDate: to,
+        roomId: roomId,
       );
     } else {
       state = state.copyWith(isLoadingMore: true);
     }
 
-    // When appending, keep current filter from state (already set above)
     final filterFrom = append ? state.fromDate : from;
     final filterTo = append ? state.toDate : to;
+    final filterRoomId = append ? state.roomId : roomId;
 
     try {
       final params = <String, dynamic>{'page': page, 'limit': _pageLimit};
+      if (filterRoomId != null) params['roomId'] = filterRoomId;
       if (filterFrom != null) params['from'] = filterFrom.toIso8601String();
       if (filterTo != null) {
         final endOfDay = DateTime(

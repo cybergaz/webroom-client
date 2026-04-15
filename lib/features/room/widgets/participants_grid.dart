@@ -24,7 +24,7 @@ class ParticipantsGrid extends StatefulWidget {
 class _ParticipantsGridState extends State<ParticipantsGrid> {
   // userId → when they last started speaking
   final Map<String, DateTime> _lastSpokeAt = {};
-  // userId → timer that clears the active glow 5 s after speaking stops
+  // userId → timer that clears the active glow after silence
   final Map<String, Timer> _speakingTimers = {};
 
   static const _activeDuration = Duration(seconds: 6);
@@ -34,7 +34,6 @@ class _ParticipantsGridState extends State<ParticipantsGrid> {
     for (final p in participants) {
       if (p.isSpeaking) {
         _lastSpokeAt[p.userId] = now;
-        // Reset the 5-second cooldown timer each tick they are speaking.
         _speakingTimers[p.userId]?.cancel();
         _speakingTimers[p.userId] = Timer(_activeDuration, () {
           if (mounted) setState(() {});
@@ -79,9 +78,8 @@ class _ParticipantsGridState extends State<ParticipantsGrid> {
       builder: (context, snapshot) {
         var participants = snapshot.data?.callParticipants ?? [];
         if (widget.hostOnly) {
-          participants = participants
-              .where((p) => p.roles.contains('host'))
-              .toList();
+          participants =
+              participants.where((p) => p.roles.contains('host')).toList();
         }
         if (widget.excludeLocal) {
           participants = participants.where((p) => !p.isLocal).toList();
@@ -101,6 +99,7 @@ class _ParticipantsGridState extends State<ParticipantsGrid> {
           );
         }
 
+        // ── hostOnly: existing compact row layout ───────────────────────
         if (widget.hostOnly) {
           if (participants.length == 1) {
             return _FullScreenParticipantTile(
@@ -130,53 +129,137 @@ class _ParticipantsGridState extends State<ParticipantsGrid> {
           );
         }
 
-        if (participants.length == 1) {
-          return _FullScreenParticipantTile(
-            participant: participants.first,
-            isActive: _isActive(participants.first),
-          );
-        }
+        // ── Host view: split into active speakers / others ──────────────
+        final active = participants.where(_isActive).toList();
+        final rest = participants.where((p) => !_isActive(p)).toList();
 
         return LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
-            // Phone: 3 cols, tablet: 4-5, desktop: 6+
             final crossAxisCount = width < 400
                 ? 3
                 : width < 600
-                ? 4
-                : width < 900
-                ? 5
-                : (width ~/ 140).clamp(6, 10);
-
+                    ? 4
+                    : width < 900
+                        ? 5
+                        : (width ~/ 140).clamp(6, 10);
             final aspectRatio = width < 400
                 ? 0.85
                 : width < 600
-                ? 0.7
-                : width < 900
-                ? 0.85
-                : 1.5;
+                    ? 0.7
+                    : width < 900
+                        ? 0.85
+                        : 1.5;
 
-            return GridView.builder(
-              padding: const EdgeInsets.all(8),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxisCount,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: aspectRatio,
-              ),
-              itemCount: participants.length,
-              itemBuilder: (context, i) => _ParticipantTile(
-                participant: participants[i],
-                isActive: _isActive(participants[i]),
-              ),
+            final gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: aspectRatio,
+            );
+
+            return CustomScrollView(
+              slivers: [
+                // ── Active Speakers ─────────────────────────────────────
+                _sectionHeader('Active Speakers'),
+                if (active.isEmpty)
+                  const SliverToBoxAdapter(child: _QuietPlaceholder())
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                    sliver: SliverGrid(
+                      gridDelegate: gridDelegate,
+                      delegate: SliverChildBuilderDelegate(
+                        (_, i) => _ParticipantTile(
+                          participant: active[i],
+                          isActive: true,
+                        ),
+                        childCount: active.length,
+                      ),
+                    ),
+                  ),
+
+                // ── Divider ─────────────────────────────────────────────
+                const SliverToBoxAdapter(child: _SectionDivider()),
+
+                // ── Others ──────────────────────────────────────────────
+                if (rest.isNotEmpty) ...[
+                  _sectionHeader('Others'),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
+                    sliver: SliverGrid(
+                      gridDelegate: gridDelegate,
+                      delegate: SliverChildBuilderDelegate(
+                        (_, i) => _ParticipantTile(
+                          participant: rest[i],
+                          isActive: false,
+                        ),
+                        childCount: rest.length,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             );
           },
         );
       },
     );
   }
+
+  static SliverToBoxAdapter _sectionHeader(String label) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+        child: Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            color: AppColors.textHint,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ),
+    );
+  }
 }
+
+// ─── Section divider ─────────────────────────────────────────────────────────
+
+class _SectionDivider extends StatelessWidget {
+  const _SectionDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      children: [
+        SizedBox(height: 4),
+        Divider(color: AppColors.divider, thickness: 1, height: 1),
+        SizedBox(height: 4),
+      ],
+    );
+  }
+}
+
+// ─── Quiet placeholder ────────────────────────────────────────────────────────
+
+class _QuietPlaceholder extends StatelessWidget {
+  const _QuietPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Text(
+        'No one is speaking',
+        style: TextStyle(color: AppColors.textHint, fontSize: 13),
+      ),
+    );
+  }
+}
+
+// ─── Full-screen tile (single participant) ────────────────────────────────────
 
 class _FullScreenParticipantTile extends StatelessWidget {
   final CallParticipantState participant;
@@ -189,9 +272,8 @@ class _FullScreenParticipantTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = participant.name.isNotEmpty
-        ? participant.name
-        : participant.userId;
+    final name =
+        participant.name.isNotEmpty ? participant.name : participant.userId;
     final speaking = isActive;
 
     return AnimatedContainer(
@@ -243,6 +325,8 @@ class _FullScreenParticipantTile extends StatelessWidget {
   }
 }
 
+// ─── Participant tile ─────────────────────────────────────────────────────────
+
 class _ParticipantTile extends StatelessWidget {
   final CallParticipantState participant;
   final bool isActive;
@@ -251,9 +335,8 @@ class _ParticipantTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = participant.name.isNotEmpty
-        ? participant.name
-        : participant.userId;
+    final name =
+        participant.name.isNotEmpty ? participant.name : participant.userId;
     final speaking = isActive;
 
     return AnimatedContainer(

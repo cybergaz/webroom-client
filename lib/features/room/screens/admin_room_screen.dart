@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:stream_video/stream_video.dart';
@@ -33,6 +34,7 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
     super.initState();
     _roomScreenNotifier = ref.read(isOnRoomScreenProvider.notifier);
     _oddsNotifier = ref.read(oddsProvider.notifier);
+    HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _roomScreenNotifier.set(true);
       ref.read(roomSessionProvider.notifier).loadRoom(widget.roomId);
@@ -41,11 +43,47 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     Future.microtask(() {
       _roomScreenNotifier.set(false);
       _oddsNotifier.stopPolling();
     });
     super.dispose();
+  }
+
+  /// Handles media/mic hardware key events from external USB microphones
+  /// (microphoneMute key) and Bluetooth earbuds (mediaPlayPause / mediaPlay /
+  /// mediaPause keys). Returns true to consume the event.
+  bool _handleHardwareKey(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    final key = event.logicalKey;
+    final isMediaKey = key == LogicalKeyboardKey.mediaPlayPause ||
+        key == LogicalKeyboardKey.mediaPlay ||
+        key == LogicalKeyboardKey.mediaPause;
+    // microphoneVolumeMute = HID consumer "mic mute" (most USB desk mics)
+    // microphoneToggle = HID consumer "microphone toggle"
+    final isMicKey = key == LogicalKeyboardKey.microphoneVolumeMute ||
+        key == LogicalKeyboardKey.microphoneToggle;
+    if (isMediaKey || isMicKey) {
+      _triggerMuteToggle();
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _triggerMuteToggle() async {
+    final call = ref.read(activeCallProvider);
+    if (call == null) return;
+    final isMuted =
+        !(call.state.valueOrNull?.localParticipant?.isAudioEnabled ?? false);
+    final willUnmute = isMuted;
+    HapticFeedback.mediumImpact();
+    await call.setMicrophoneEnabled(enabled: willUnmute);
+    if (willUnmute) {
+      ref.read(hostRecordingProvider.notifier).onUnmute();
+    } else {
+      ref.read(hostRecordingProvider.notifier).onMute();
+    }
   }
 
   @override
@@ -139,15 +177,7 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
           call: call,
           isHost: true,
           isMuted: isMuted,
-          onMuteToggle: () async {
-            final willUnmute = isMuted;
-            await call.setMicrophoneEnabled(enabled: willUnmute);
-            if (willUnmute) {
-              ref.read(hostRecordingProvider.notifier).onUnmute();
-            } else {
-              ref.read(hostRecordingProvider.notifier).onMute();
-            }
-          },
+          onMuteToggle: _triggerMuteToggle,
           onEndOrLeave: () async {
             // Stop host recording before ending
             await ref.read(hostRecordingProvider.notifier).onMute();

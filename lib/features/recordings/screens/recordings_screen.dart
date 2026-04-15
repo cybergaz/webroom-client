@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/my_recording_model.dart';
+import '../../../data/models/room_model.dart';
+import '../../../domain/enums/room_status.dart';
+import '../../home/providers/rooms_provider.dart';
 import '../providers/my_recordings_provider.dart';
 import '../widgets/audio_player_sheet.dart';
 
@@ -15,6 +18,7 @@ class RecordingsScreen extends ConsumerStatefulWidget {
 }
 
 class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
+  RoomModel? _selectedRoom;
   final _scrollController = ScrollController();
 
   @override
@@ -30,10 +34,20 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
   }
 
   void _onScroll() {
+    if (_selectedRoom == null) return;
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 300) {
       ref.read(recordingsNotifierProvider.notifier).loadMore();
     }
+  }
+
+  void _selectRoom(RoomModel room) {
+    ref.read(recordingsNotifierProvider.notifier).loadForRoom(room.roomId);
+    setState(() => _selectedRoom = room);
+  }
+
+  void _clearRoom() {
+    setState(() => _selectedRoom = null);
   }
 
   Future<void> _pickDate({required bool isFrom}) async {
@@ -61,12 +75,10 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
     );
     if (!mounted || picked == null) return;
 
-    ref
-        .read(recordingsNotifierProvider.notifier)
-        .applyFilter(
-          from: isFrom ? picked : state.fromDate,
-          to: isFrom ? state.toDate : picked,
-        );
+    ref.read(recordingsNotifierProvider.notifier).applyFilter(
+      from: isFrom ? picked : state.fromDate,
+      to: isFrom ? state.toDate : picked,
+    );
   }
 
   void _openPlayer(MyRecording recording) {
@@ -85,6 +97,94 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      canPop: _selectedRoom == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _clearRoom();
+      },
+      child: _selectedRoom == null
+          ? _buildRoomsList()
+          : _buildRoomRecordings(_selectedRoom!),
+    );
+  }
+
+  // ─── Rooms list view ────────────────────────────────────────────────────────
+
+  Widget _buildRoomsList() {
+    final roomsAsync = ref.watch(roomsProvider);
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        title: const Text('My Recordings'),
+      ),
+      body: roomsAsync.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.accent),
+        ),
+        error: (_, _) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: AppColors.error,
+                size: 48,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Failed to load rooms',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.invalidate(roomsProvider),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+        data: (rooms) {
+          if (rooms.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.meeting_room_outlined,
+                    color: AppColors.textHint,
+                    size: 52,
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'No rooms found',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+            itemCount: rooms.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            itemBuilder: (_, i) => _RoomTile(
+              room: rooms[i],
+              onTap: () => _selectRoom(rooms[i]),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ─── Room recordings view ────────────────────────────────────────────────────
+
+  Widget _buildRoomRecordings(RoomModel room) {
     final state = ref.watch(recordingsNotifierProvider);
     final hasFilter = state.fromDate != null || state.toDate != null;
 
@@ -92,7 +192,11 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
-        title: const Text('My Recordings'),
+        title: Text(room.name),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: _clearRoom,
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
@@ -104,7 +208,7 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
       ),
       body: Column(
         children: [
-          // ─── Filter bar ────────────────────────────────────────────────────
+          // ─── Filter bar ───────────────────────────────────────────────────
           Container(
             color: AppColors.surface,
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
@@ -128,7 +232,7 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
                 ),
                 Row(
                   children: [
-                    if (hasFilter) ...[
+                    if (hasFilter)
                       GestureDetector(
                         onTap: () => ref
                             .read(recordingsNotifierProvider.notifier)
@@ -165,7 +269,6 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
                           ),
                         ),
                       ),
-                    ],
                     const Spacer(),
                     if (!state.isLoading)
                       Text(
@@ -182,7 +285,7 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
           ),
           const Divider(height: 1, color: AppColors.divider),
 
-          // ─── Content ───────────────────────────────────────────────────────
+          // ─── Content ──────────────────────────────────────────────────────
           Expanded(
             child: state.isLoading
                 ? const Center(
@@ -194,7 +297,7 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
                         ref.read(recordingsNotifierProvider.notifier).refresh(),
                   )
                 : state.recordings.isEmpty
-                ? const _EmptyView()
+                ? _EmptyView(hasFilter: hasFilter)
                 : _RecordingsList(
                     scrollController: _scrollController,
                     recordings: state.recordings,
@@ -205,6 +308,104 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Room tile ────────────────────────────────────────────────────────────────
+
+class _RoomTile extends StatelessWidget {
+  final RoomModel room;
+  final VoidCallback onTap;
+
+  const _RoomTile({required this.room, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.meeting_room_outlined,
+                  color: AppColors.accent,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      room.name,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (room.description != null &&
+                        room.description!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        room.description!,
+                        style: const TextStyle(
+                          color: AppColors.textHint,
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _StatusDot(status: room.status),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textHint,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusDot extends StatelessWidget {
+  final RoomStatus status;
+  const _StatusDot({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (status) {
+      RoomStatus.live => const Color(0xFF4CAF50),
+      RoomStatus.active => AppColors.accent,
+      RoomStatus.inactive => AppColors.textHint,
+      RoomStatus.ended => AppColors.textHint,
+    };
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }
@@ -269,7 +470,7 @@ class _DateChip extends StatelessWidget {
             ),
             const SizedBox(width: 5),
             Text(
-              isSet ? '${label}: ${_fmtDate(date!)}' : label,
+              isSet ? '$label: ${_fmtDate(date!)}' : label,
               style: TextStyle(
                 color: isSet ? AppColors.accent : AppColors.textHint,
                 fontSize: 12,
@@ -325,11 +526,10 @@ class _RecordingsList extends StatelessWidget {
         }
         return switch (items[i]) {
           _DayHeader(:final label) => _DayHeaderTile(label: label),
-          _RoomHeader(:final name) => _RoomHeaderTile(name: name),
           _RecordingItem(:final recording) => _RecordingTile(
-            recording: recording,
-            onTap: () => onTap(recording),
-          ),
+              recording: recording,
+              onTap: () => onTap(recording),
+            ),
         };
       },
     );
@@ -338,18 +538,12 @@ class _RecordingsList extends StatelessWidget {
   List<_ListItem> _buildItems(List<MyRecording> recs) {
     final items = <_ListItem>[];
     String? curDay;
-    String? curRoom;
 
     for (final r in recs) {
       final day = _dayLabel(r.createdAt);
       if (day != curDay) {
         curDay = day;
-        curRoom = null;
         items.add(_DayHeader(day));
-      }
-      if (r.roomName != curRoom) {
-        curRoom = r.roomName;
-        items.add(_RoomHeader(r.roomName));
       }
       items.add(_RecordingItem(r));
     }
@@ -395,11 +589,6 @@ class _DayHeader extends _ListItem {
   _DayHeader(this.label);
 }
 
-class _RoomHeader extends _ListItem {
-  final String name;
-  _RoomHeader(this.name);
-}
-
 class _RecordingItem extends _ListItem {
   final MyRecording recording;
   _RecordingItem(this.recording);
@@ -423,40 +612,6 @@ class _DayHeaderTile extends StatelessWidget {
           fontWeight: FontWeight.w700,
           letterSpacing: 0.3,
         ),
-      ),
-    );
-  }
-}
-
-class _RoomHeaderTile extends StatelessWidget {
-  final String name;
-  const _RoomHeaderTile({required this.name});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.meeting_room_outlined,
-            color: AppColors.accent,
-            size: 13,
-          ),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Text(
-              name,
-              style: const TextStyle(
-                color: AppColors.accent,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.4,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -556,24 +711,27 @@ class _RecordingTile extends StatelessWidget {
 // ─── Empty / error views ──────────────────────────────────────────────────────
 
 class _EmptyView extends StatelessWidget {
-  const _EmptyView();
+  final bool hasFilter;
+  const _EmptyView({this.hasFilter = false});
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.mic_none_rounded, color: AppColors.textHint, size: 52),
-          SizedBox(height: 12),
-          Text(
+          const Icon(Icons.mic_none_rounded, color: AppColors.textHint, size: 52),
+          const SizedBox(height: 12),
+          const Text(
             'No recordings found',
             style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
-            'Try changing the date filter',
-            style: TextStyle(color: AppColors.textHint, fontSize: 13),
+            hasFilter
+                ? 'Try changing the date filter'
+                : 'No recordings in this room yet',
+            style: const TextStyle(color: AppColors.textHint, fontSize: 13),
           ),
         ],
       ),
