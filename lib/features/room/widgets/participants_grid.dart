@@ -78,8 +78,9 @@ class _ParticipantsGridState extends State<ParticipantsGrid> {
       builder: (context, snapshot) {
         var participants = snapshot.data?.callParticipants ?? [];
         if (widget.hostOnly) {
-          participants =
-              participants.where((p) => p.roles.contains('host')).toList();
+          participants = participants
+              .where((p) => p.roles.contains('host'))
+              .toList();
         }
         if (widget.excludeLocal) {
           participants = participants.where((p) => !p.isLocal).toList();
@@ -139,17 +140,17 @@ class _ParticipantsGridState extends State<ParticipantsGrid> {
             final crossAxisCount = width < 400
                 ? 3
                 : width < 600
-                    ? 4
-                    : width < 900
-                        ? 5
-                        : (width ~/ 140).clamp(6, 10);
+                ? 4
+                : width < 900
+                ? 5
+                : (width ~/ 140).clamp(6, 10);
             final aspectRatio = width < 400
                 ? 0.85
                 : width < 600
-                    ? 0.7
-                    : width < 900
-                        ? 0.85
-                        : 1.5;
+                ? 0.7
+                : width < 900
+                ? 0.85
+                : 1.5;
 
             final gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
@@ -272,8 +273,9 @@ class _FullScreenParticipantTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name =
-        participant.name.isNotEmpty ? participant.name : participant.userId;
+    final name = participant.name.isNotEmpty
+        ? participant.name
+        : participant.userId;
     final speaking = isActive;
 
     return AnimatedContainer(
@@ -301,7 +303,7 @@ class _FullScreenParticipantTile extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            name,
+            name.toUpperCase(),
             style: TextStyle(
               color: speaking ? AppColors.success : AppColors.textPrimary,
               fontSize: 36,
@@ -335,8 +337,9 @@ class _ParticipantTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name =
-        participant.name.isNotEmpty ? participant.name : participant.userId;
+    final name = participant.name.isNotEmpty
+        ? participant.name
+        : participant.userId;
     final speaking = isActive;
 
     return AnimatedContainer(
@@ -364,7 +367,7 @@ class _ParticipantTile extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Text(
-              name,
+              name.toUpperCase(),
               style: TextStyle(
                 color: speaking ? AppColors.success : AppColors.textPrimary,
                 fontSize: 20,
