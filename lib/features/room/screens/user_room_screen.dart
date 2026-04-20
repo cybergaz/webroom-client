@@ -17,6 +17,7 @@ import '../../../core/storage/secure_storage.dart';
 import '../../../core/constants/storage_keys.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/utils/error_mapper.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class UserRoomScreen extends ConsumerStatefulWidget {
@@ -128,8 +129,12 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
         },
         error: (e, _) {
           if (mounted) {
+            final message = mapErrorToMessage(e);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to join room. Please try again.')),
+              SnackBar(
+                content: Text(message),
+                duration: const Duration(seconds: 5),
+              ),
             );
             context.go('/home');
           }

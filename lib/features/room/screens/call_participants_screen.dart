@@ -20,7 +20,9 @@ class CallParticipantsScreen extends StatelessWidget {
           stream: call.state.valueStream,
           initialData: call.state.valueOrNull,
           builder: (context, snap) {
-            final count = snap.data?.callParticipants.length ?? 0;
+            final count = _dedupeByUserId(
+              snap.data?.callParticipants ?? const [],
+            ).length;
             return Text('Participants ($count)');
           },
         ),
@@ -43,7 +45,9 @@ class CallParticipantsScreen extends StatelessWidget {
         stream: call.state.valueStream,
         initialData: call.state.valueOrNull,
         builder: (context, snapshot) {
-          final participants = snapshot.data?.callParticipants ?? [];
+          final participants = _dedupeByUserId(
+            snapshot.data?.callParticipants ?? const [],
+          );
           if (participants.isEmpty) {
             return const Center(
               child: Text(
@@ -74,6 +78,29 @@ class CallParticipantsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+// A force-killed client's SFU session lingers until Stream's timeout fires,
+// so the same userId can appear under two sessionIds. Keep the live one.
+List<CallParticipantState> _dedupeByUserId(
+  List<CallParticipantState> participants,
+) {
+  int liveness(CallParticipantState p) {
+    var score = 0;
+    if (p.isOnline) score += 1000;
+    score += p.publishedTracks.length * 10;
+    score += p.connectionQuality.index;
+    return score;
+  }
+
+  final byUser = <String, CallParticipantState>{};
+  for (final p in participants) {
+    final existing = byUser[p.userId];
+    if (existing == null || liveness(p) > liveness(existing)) {
+      byUser[p.userId] = p;
+    }
+  }
+  return byUser.values.toList();
 }
 
 class _ParticipantTile extends StatelessWidget {

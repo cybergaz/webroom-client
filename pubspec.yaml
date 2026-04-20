@@ -2,7 +2,7 @@ name: webroom_client
 description: "Webroom - Audio Room App"
 publish_to: 'none'
 
-version: 1.0.6+5
+version: 1.0.7+6
 
 environment:
   sdk: ^3.8.0

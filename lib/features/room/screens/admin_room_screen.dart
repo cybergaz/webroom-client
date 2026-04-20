@@ -15,6 +15,7 @@ import '../widgets/participants_grid.dart';
 import 'call_participants_screen.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/utils/error_mapper.dart';
 
 class AdminRoomScreen extends ConsumerStatefulWidget {
   final String roomId;
@@ -100,8 +101,12 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
         },
         error: (e, _) {
           if (mounted) {
+            final message = mapErrorToMessage(e);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to join room. Please try again.')),
+              SnackBar(
+                content: Text(message),
+                duration: const Duration(seconds: 5),
+              ),
             );
             context.go('/home');
           }

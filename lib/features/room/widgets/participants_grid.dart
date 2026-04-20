@@ -57,6 +57,28 @@ class _ParticipantsGridState extends State<ParticipantsGrid> {
     super.dispose();
   }
 
+  List<CallParticipantState> _dedupeByUserId(
+    List<CallParticipantState> participants,
+  ) {
+    final byUser = <String, CallParticipantState>{};
+    for (final p in participants) {
+      final existing = byUser[p.userId];
+      if (existing == null || _liveness(p) > _liveness(existing)) {
+        byUser[p.userId] = p;
+      }
+    }
+    return byUser.values.toList();
+  }
+
+  int _liveness(CallParticipantState p) {
+    // Higher = more likely to be the real, current session.
+    var score = 0;
+    if (p.isOnline) score += 1000;
+    score += p.publishedTracks.length * 10;
+    score += p.connectionQuality.index;
+    return score;
+  }
+
   List<CallParticipantState> _sorted(List<CallParticipantState> participants) {
     final list = [...participants];
     list.sort((a, b) {
@@ -85,6 +107,10 @@ class _ParticipantsGridState extends State<ParticipantsGrid> {
         if (widget.excludeLocal) {
           participants = participants.where((p) => !p.isLocal).toList();
         }
+        // A force-killed client's SFU session lingers until Stream's timeout
+        // fires, so the same userId can appear under two sessionIds. Keep the
+        // live one so the host sees one tile per person.
+        participants = _dedupeByUserId(participants);
 
         _updateSpeakingTimes(participants);
         participants = _sorted(participants);
