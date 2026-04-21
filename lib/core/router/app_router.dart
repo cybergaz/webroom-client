@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:webroom_client/features/home/screens/home_screen.dart';
-import 'package:webroom_client/features/home/screens/profile_screen.dart';
 import '../../features/recordings/screens/recordings_screen.dart';
 import '../../features/session_history/screens/session_history_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
@@ -80,11 +79,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/home',
             name: 'home',
             builder: (context, state) => const HomeScreen(),
-          ),
-          GoRoute(
-            path: '/profile',
-            name: 'profile',
-            builder: (context, state) => const ProfileScreen(),
           ),
           GoRoute(
             path: '/recordings',

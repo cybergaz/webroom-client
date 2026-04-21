@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 
-enum NavDestination { rooms, recordings, sessionHistory, profile, settings }
+enum NavDestination { rooms, recordings, sessionHistory, settings }
 
 class FloatingPillNavBar extends StatelessWidget {
   final NavDestination current;
@@ -77,14 +77,6 @@ class FloatingPillNavBar extends StatelessWidget {
                       label: 'History',
                       active: current == NavDestination.sessionHistory,
                       onTap: () => context.go('/session-history'),
-                    ),
-                  ),
-                  Expanded(
-                    child: _NavButton(
-                      icon: Icons.person_rounded,
-                      label: 'Profile',
-                      active: current == NavDestination.profile,
-                      onTap: () => context.go('/profile'),
                     ),
                   ),
                   Expanded(

@@ -36,7 +36,6 @@ class AppShell extends StatelessWidget {
     if (path.startsWith('/session-history')) {
       return NavDestination.sessionHistory;
     }
-    if (path.startsWith('/profile')) return NavDestination.profile;
     if (path.startsWith('/settings')) return NavDestination.settings;
     return null;
   }
