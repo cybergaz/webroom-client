@@ -10,7 +10,9 @@ import '../providers/getstream_provider.dart';
 import '../providers/odds_provider.dart';
 import '../providers/room_session_provider.dart';
 import '../providers/ptt_provider.dart';
+import '../widgets/banner_slider.dart';
 import '../widgets/market_odds_box.dart';
+import '../widgets/marquee_text.dart';
 import '../widgets/odds_selection_dialog.dart';
 import '../../../core/network/websocket_service.dart';
 import '../../../core/storage/secure_storage.dart';
@@ -18,6 +20,7 @@ import '../../../core/constants/storage_keys.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/utils/error_mapper.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class UserRoomScreen extends ConsumerStatefulWidget {
@@ -75,8 +78,9 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
           payload['userId'] == myId) {
         await ref.read(roomSessionProvider.notifier).leaveRoom();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('You were removed from the room')),
+          AppSnackBar.show(
+            context,
+            message: 'You were removed from the room',
           );
           context.go('/home');
         }
@@ -114,9 +118,7 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
       next.when(
         data: (session) {
           if (session.isEnded && mounted) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Room ended by host')));
+            AppSnackBar.show(context, message: 'Room ended by host');
             context.go('/home');
           }
 
@@ -130,11 +132,11 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
         error: (e, _) {
           if (mounted) {
             final message = mapErrorToMessage(e);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(message),
-                duration: const Duration(seconds: 5),
-              ),
+            AppSnackBar.show(
+              context,
+              message: message,
+              isError: true,
+              duration: const Duration(seconds: 5),
             );
             context.go('/home');
           }
@@ -145,7 +147,14 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
 
     final call = ref.watch(activeCallProvider);
     final sessionState = ref.watch(roomSessionProvider);
-    final roomName = sessionState.isLoading ? '' : (sessionState.value?.roomName ?? '');
+    final session = sessionState.value;
+    final roomName = sessionState.isLoading ? '' : (session?.roomName ?? '');
+    final banners = session?.banners ?? const <String>[];
+    final hasBanners = banners.isNotEmpty;
+    final marqueeRaw = session?.marqueeText;
+    final marquee = (marqueeRaw != null && marqueeRaw.trim().isNotEmpty)
+        ? marqueeRaw
+        : null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -202,11 +211,19 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
                   ],
                 ),
               ),
+            if (hasBanners) BannerSlider(banners: banners),
             const MarketOddsBox(),
+            if (hasBanners && call != null) _CompactHostRow(call: call),
             if (call == null)
               const Expanded(child: Center(child: CircularProgressIndicator()))
             else
-              Expanded(child: _UserCallView(call: call)),
+              Expanded(
+                child: _UserCallView(
+                  call: call,
+                  showLargeHost: !hasBanners,
+                  marqueeText: marquee,
+                ),
+              ),
           ],
         ),
       ),
@@ -220,8 +237,14 @@ class _UserRoomScreenState extends ConsumerState<UserRoomScreen> {
 
 class _UserCallView extends ConsumerWidget {
   final Call call;
+  final bool showLargeHost;
+  final String? marqueeText;
 
-  const _UserCallView({required this.call});
+  const _UserCallView({
+    required this.call,
+    this.showLargeHost = true,
+    this.marqueeText,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -229,14 +252,10 @@ class _UserCallView extends ConsumerWidget {
 
     return Column(
       children: [
-        // Host display — upper half
+        if (showLargeHost)
+          Expanded(flex: 5, child: _HostCard(call: call)),
         Expanded(
-          flex: 5,
-          child: _HostCard(call: call),
-        ),
-        // PTT button — lower half
-        Expanded(
-          flex: 5,
+          flex: showLargeHost ? 5 : 10,
           child: _PttArea(
             isTransmitting: ptt.isTransmitting,
             audioLevel: ptt.audioLevel,
@@ -244,7 +263,8 @@ class _UserCallView extends ConsumerWidget {
             onPttUp: () => ref.read(pttStateProvider.notifier).stopTransmitting(),
           ),
         ),
-        // Bottom controls
+        if (marqueeText != null && marqueeText!.trim().isNotEmpty)
+          _RoomMarquee(text: marqueeText!),
         _BottomControls(
           call: call,
           onLeave: () async {
@@ -823,6 +843,166 @@ class _CtrlBtn extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Compact host row (shown in place of the large host card when banners exist)
+// ---------------------------------------------------------------------------
+
+class _CompactHostRow extends StatelessWidget {
+  final Call call;
+
+  const _CompactHostRow({required this.call});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<CallState>(
+      stream: call.state.valueStream,
+      initialData: call.state.valueOrNull,
+      builder: (context, snapshot) {
+        final participants = snapshot.data?.callParticipants ?? [];
+        final hostList =
+            participants.where((p) => p.roles.contains('host')).toList();
+        final host = hostList.isEmpty ? null : hostList.first;
+        final speaking = host?.isSpeaking ?? false;
+        final name = host == null
+            ? 'Connecting...'
+            : (host.name.isNotEmpty ? host.name : host.userId);
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+          padding: const EdgeInsets.fromLTRB(8, 6, 14, 6),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(100),
+            border: Border.all(
+              color: speaking
+                  ? AppColors.success.withValues(alpha: 0.55)
+                  : AppColors.cardBorder,
+              width: speaking ? 1.5 : 1,
+            ),
+            boxShadow: speaking
+                ? [
+                    BoxShadow(
+                      color: AppColors.success.withValues(alpha: 0.15),
+                      blurRadius: 14,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: speaking
+                    ? AppColors.success.withValues(alpha: 0.18)
+                    : AppColors.accent.withValues(alpha: 0.15),
+                backgroundImage: host?.image != null && host!.image!.isNotEmpty
+                    ? NetworkImage(host.image!)
+                    : null,
+                child: (host == null ||
+                        host.image == null ||
+                        host.image!.isEmpty)
+                    ? Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: TextStyle(
+                          color: speaking
+                              ? AppColors.success
+                              : AppColors.accent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                speaking ? 'Speaking' : (host == null ? '' : 'Host'),
+                style: TextStyle(
+                  color:
+                      speaking ? AppColors.success : AppColors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: speaking ? AppColors.success : AppColors.textHint,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Room marquee (announcements / promotions ticker)
+// ---------------------------------------------------------------------------
+
+class _RoomMarquee extends StatelessWidget {
+  final String text;
+
+  const _RoomMarquee({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 26,
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.10),
+        border: Border(
+          top: BorderSide(color: AppColors.accent.withValues(alpha: 0.25)),
+          bottom: BorderSide(color: AppColors.accent.withValues(alpha: 0.25)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.campaign_rounded,
+            size: 14,
+            color: AppColors.accent.withValues(alpha: 0.8),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: MarqueeText(
+              text: text,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
         ],
       ),

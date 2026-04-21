@@ -16,6 +16,8 @@ abstract class RoomModel with _$RoomModel {
     required String getstreamCallId,
     String? description,
     String? hostId,
+    @Default(<String>[]) List<String> banners,
+    String? marqueeText,
   }) = _RoomModel;
 
   factory RoomModel.fromJson(Map<String, dynamic> json) => _$RoomModelFromJson(json);

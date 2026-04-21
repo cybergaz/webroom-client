@@ -6,7 +6,9 @@ import '../widgets/room_card.dart';
 import '../widgets/create_room_sheet.dart';
 import '../widgets/join_by_id_sheet.dart';
 import '../../../features/auth/providers/auth_provider.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/connection_status_bar.dart';
+import '../../shell/widgets/floating_pill_navbar.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/error_mapper.dart';
 import '../../../domain/enums/room_status.dart';
@@ -30,18 +32,9 @@ class HomeScreen extends ConsumerWidget {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
-        leading: IconButton(
-          icon: const Icon(Icons.person_rounded),
-          tooltip: 'Profile',
-          onPressed: () => context.push('/profile'),
-        ),
+        automaticallyImplyLeading: false,
         title: _AppBarTitle(name: user?.name, role: user?.role),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.mic_external_on_rounded),
-            tooltip: 'My Recordings',
-            onPressed: () => context.push('/recordings'),
-          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh',
@@ -86,7 +79,12 @@ class HomeScreen extends ConsumerWidget {
                     );
                   }
                   return ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      16,
+                      16,
+                      FloatingPillNavBar.bottomPadding(context) + 8,
+                    ),
                     itemCount: rooms.length,
                     itemBuilder: (context, i) => RoomCard(
                       room: rooms[i],
@@ -101,19 +99,13 @@ class HomeScreen extends ConsumerWidget {
                             activeSession != null &&
                             activeSession.isInCall &&
                             activeSession.roomId != room.roomId) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
+                          AppSnackBar.show(
+                            context,
+                            message:
                                 'You are already in "${activeSession.roomName}". Leave it first.',
-                              ),
-                              action: SnackBarAction(
-                                label: 'Go back',
-                                onPressed: () {
-                                  context.push(
-                                    '/room/${activeSession.roomId}',
-                                  );
-                                },
-                              ),
+                            actionLabel: 'Go back',
+                            onAction: () => context.push(
+                              '/room/${activeSession.roomId}',
                             ),
                           );
                           return;
@@ -130,9 +122,7 @@ class HomeScreen extends ConsumerWidget {
                             RoomStatus.ended => 'This room has ended.',
                             RoomStatus.live => '', // unreachable
                           };
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text(msg)));
+                          AppSnackBar.show(context, message: msg);
                           return;
                         }
 

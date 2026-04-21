@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$RoomModel {
 
-@JsonKey(name: 'id') String get roomId; String get name; RoomStatus get status; int get memberCount; String get createdBy; DateTime? get createdAt; String get getstreamCallId; String? get description; String? get hostId;
+@JsonKey(name: 'id') String get roomId; String get name; RoomStatus get status; int get memberCount; String get createdBy; DateTime? get createdAt; String get getstreamCallId; String? get description; String? get hostId; List<String> get banners; String? get marqueeText;
 /// Create a copy of RoomModel
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $RoomModelCopyWith<RoomModel> get copyWith => _$RoomModelCopyWithImpl<RoomModel>
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is RoomModel&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.name, name) || other.name == name)&&(identical(other.status, status) || other.status == status)&&(identical(other.memberCount, memberCount) || other.memberCount == memberCount)&&(identical(other.createdBy, createdBy) || other.createdBy == createdBy)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.getstreamCallId, getstreamCallId) || other.getstreamCallId == getstreamCallId)&&(identical(other.description, description) || other.description == description)&&(identical(other.hostId, hostId) || other.hostId == hostId));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is RoomModel&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.name, name) || other.name == name)&&(identical(other.status, status) || other.status == status)&&(identical(other.memberCount, memberCount) || other.memberCount == memberCount)&&(identical(other.createdBy, createdBy) || other.createdBy == createdBy)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.getstreamCallId, getstreamCallId) || other.getstreamCallId == getstreamCallId)&&(identical(other.description, description) || other.description == description)&&(identical(other.hostId, hostId) || other.hostId == hostId)&&const DeepCollectionEquality().equals(other.banners, banners)&&(identical(other.marqueeText, marqueeText) || other.marqueeText == marqueeText));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,roomId,name,status,memberCount,createdBy,createdAt,getstreamCallId,description,hostId);
+int get hashCode => Object.hash(runtimeType,roomId,name,status,memberCount,createdBy,createdAt,getstreamCallId,description,hostId,const DeepCollectionEquality().hash(banners),marqueeText);
 
 @override
 String toString() {
-  return 'RoomModel(roomId: $roomId, name: $name, status: $status, memberCount: $memberCount, createdBy: $createdBy, createdAt: $createdAt, getstreamCallId: $getstreamCallId, description: $description, hostId: $hostId)';
+  return 'RoomModel(roomId: $roomId, name: $name, status: $status, memberCount: $memberCount, createdBy: $createdBy, createdAt: $createdAt, getstreamCallId: $getstreamCallId, description: $description, hostId: $hostId, banners: $banners, marqueeText: $marqueeText)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $RoomModelCopyWith<$Res>  {
   factory $RoomModelCopyWith(RoomModel value, $Res Function(RoomModel) _then) = _$RoomModelCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'id') String roomId, String name, RoomStatus status, int memberCount, String createdBy, DateTime? createdAt, String getstreamCallId, String? description, String? hostId
+@JsonKey(name: 'id') String roomId, String name, RoomStatus status, int memberCount, String createdBy, DateTime? createdAt, String getstreamCallId, String? description, String? hostId, List<String> banners, String? marqueeText
 });
 
 
@@ -65,7 +65,7 @@ class _$RoomModelCopyWithImpl<$Res>
 
 /// Create a copy of RoomModel
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? roomId = null,Object? name = null,Object? status = null,Object? memberCount = null,Object? createdBy = null,Object? createdAt = freezed,Object? getstreamCallId = null,Object? description = freezed,Object? hostId = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? roomId = null,Object? name = null,Object? status = null,Object? memberCount = null,Object? createdBy = null,Object? createdAt = freezed,Object? getstreamCallId = null,Object? description = freezed,Object? hostId = freezed,Object? banners = null,Object? marqueeText = freezed,}) {
   return _then(_self.copyWith(
 roomId: null == roomId ? _self.roomId : roomId // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -76,6 +76,8 @@ as String,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignor
 as DateTime?,getstreamCallId: null == getstreamCallId ? _self.getstreamCallId : getstreamCallId // ignore: cast_nullable_to_non_nullable
 as String,description: freezed == description ? _self.description : description // ignore: cast_nullable_to_non_nullable
 as String?,hostId: freezed == hostId ? _self.hostId : hostId // ignore: cast_nullable_to_non_nullable
+as String?,banners: null == banners ? _self.banners : banners // ignore: cast_nullable_to_non_nullable
+as List<String>,marqueeText: freezed == marqueeText ? _self.marqueeText : marqueeText // ignore: cast_nullable_to_non_nullable
 as String?,
   ));
 }
@@ -161,10 +163,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'id')  String roomId,  String name,  RoomStatus status,  int memberCount,  String createdBy,  DateTime? createdAt,  String getstreamCallId,  String? description,  String? hostId)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'id')  String roomId,  String name,  RoomStatus status,  int memberCount,  String createdBy,  DateTime? createdAt,  String getstreamCallId,  String? description,  String? hostId,  List<String> banners,  String? marqueeText)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _RoomModel() when $default != null:
-return $default(_that.roomId,_that.name,_that.status,_that.memberCount,_that.createdBy,_that.createdAt,_that.getstreamCallId,_that.description,_that.hostId);case _:
+return $default(_that.roomId,_that.name,_that.status,_that.memberCount,_that.createdBy,_that.createdAt,_that.getstreamCallId,_that.description,_that.hostId,_that.banners,_that.marqueeText);case _:
   return orElse();
 
 }
@@ -182,10 +184,10 @@ return $default(_that.roomId,_that.name,_that.status,_that.memberCount,_that.cre
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'id')  String roomId,  String name,  RoomStatus status,  int memberCount,  String createdBy,  DateTime? createdAt,  String getstreamCallId,  String? description,  String? hostId)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'id')  String roomId,  String name,  RoomStatus status,  int memberCount,  String createdBy,  DateTime? createdAt,  String getstreamCallId,  String? description,  String? hostId,  List<String> banners,  String? marqueeText)  $default,) {final _that = this;
 switch (_that) {
 case _RoomModel():
-return $default(_that.roomId,_that.name,_that.status,_that.memberCount,_that.createdBy,_that.createdAt,_that.getstreamCallId,_that.description,_that.hostId);case _:
+return $default(_that.roomId,_that.name,_that.status,_that.memberCount,_that.createdBy,_that.createdAt,_that.getstreamCallId,_that.description,_that.hostId,_that.banners,_that.marqueeText);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -202,10 +204,10 @@ return $default(_that.roomId,_that.name,_that.status,_that.memberCount,_that.cre
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'id')  String roomId,  String name,  RoomStatus status,  int memberCount,  String createdBy,  DateTime? createdAt,  String getstreamCallId,  String? description,  String? hostId)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'id')  String roomId,  String name,  RoomStatus status,  int memberCount,  String createdBy,  DateTime? createdAt,  String getstreamCallId,  String? description,  String? hostId,  List<String> banners,  String? marqueeText)?  $default,) {final _that = this;
 switch (_that) {
 case _RoomModel() when $default != null:
-return $default(_that.roomId,_that.name,_that.status,_that.memberCount,_that.createdBy,_that.createdAt,_that.getstreamCallId,_that.description,_that.hostId);case _:
+return $default(_that.roomId,_that.name,_that.status,_that.memberCount,_that.createdBy,_that.createdAt,_that.getstreamCallId,_that.description,_that.hostId,_that.banners,_that.marqueeText);case _:
   return null;
 
 }
@@ -217,7 +219,7 @@ return $default(_that.roomId,_that.name,_that.status,_that.memberCount,_that.cre
 @JsonSerializable()
 
 class _RoomModel implements RoomModel {
-  const _RoomModel({@JsonKey(name: 'id') required this.roomId, required this.name, required this.status, this.memberCount = 0, this.createdBy = '', this.createdAt, required this.getstreamCallId, this.description, this.hostId});
+  const _RoomModel({@JsonKey(name: 'id') required this.roomId, required this.name, required this.status, this.memberCount = 0, this.createdBy = '', this.createdAt, required this.getstreamCallId, this.description, this.hostId, final  List<String> banners = const <String>[], this.marqueeText}): _banners = banners;
   factory _RoomModel.fromJson(Map<String, dynamic> json) => _$RoomModelFromJson(json);
 
 @override@JsonKey(name: 'id') final  String roomId;
@@ -229,6 +231,14 @@ class _RoomModel implements RoomModel {
 @override final  String getstreamCallId;
 @override final  String? description;
 @override final  String? hostId;
+ final  List<String> _banners;
+@override@JsonKey() List<String> get banners {
+  if (_banners is EqualUnmodifiableListView) return _banners;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_banners);
+}
+
+@override final  String? marqueeText;
 
 /// Create a copy of RoomModel
 /// with the given fields replaced by the non-null parameter values.
@@ -243,16 +253,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _RoomModel&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.name, name) || other.name == name)&&(identical(other.status, status) || other.status == status)&&(identical(other.memberCount, memberCount) || other.memberCount == memberCount)&&(identical(other.createdBy, createdBy) || other.createdBy == createdBy)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.getstreamCallId, getstreamCallId) || other.getstreamCallId == getstreamCallId)&&(identical(other.description, description) || other.description == description)&&(identical(other.hostId, hostId) || other.hostId == hostId));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _RoomModel&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.name, name) || other.name == name)&&(identical(other.status, status) || other.status == status)&&(identical(other.memberCount, memberCount) || other.memberCount == memberCount)&&(identical(other.createdBy, createdBy) || other.createdBy == createdBy)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.getstreamCallId, getstreamCallId) || other.getstreamCallId == getstreamCallId)&&(identical(other.description, description) || other.description == description)&&(identical(other.hostId, hostId) || other.hostId == hostId)&&const DeepCollectionEquality().equals(other._banners, _banners)&&(identical(other.marqueeText, marqueeText) || other.marqueeText == marqueeText));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,roomId,name,status,memberCount,createdBy,createdAt,getstreamCallId,description,hostId);
+int get hashCode => Object.hash(runtimeType,roomId,name,status,memberCount,createdBy,createdAt,getstreamCallId,description,hostId,const DeepCollectionEquality().hash(_banners),marqueeText);
 
 @override
 String toString() {
-  return 'RoomModel(roomId: $roomId, name: $name, status: $status, memberCount: $memberCount, createdBy: $createdBy, createdAt: $createdAt, getstreamCallId: $getstreamCallId, description: $description, hostId: $hostId)';
+  return 'RoomModel(roomId: $roomId, name: $name, status: $status, memberCount: $memberCount, createdBy: $createdBy, createdAt: $createdAt, getstreamCallId: $getstreamCallId, description: $description, hostId: $hostId, banners: $banners, marqueeText: $marqueeText)';
 }
 
 
@@ -263,7 +273,7 @@ abstract mixin class _$RoomModelCopyWith<$Res> implements $RoomModelCopyWith<$Re
   factory _$RoomModelCopyWith(_RoomModel value, $Res Function(_RoomModel) _then) = __$RoomModelCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'id') String roomId, String name, RoomStatus status, int memberCount, String createdBy, DateTime? createdAt, String getstreamCallId, String? description, String? hostId
+@JsonKey(name: 'id') String roomId, String name, RoomStatus status, int memberCount, String createdBy, DateTime? createdAt, String getstreamCallId, String? description, String? hostId, List<String> banners, String? marqueeText
 });
 
 
@@ -280,7 +290,7 @@ class __$RoomModelCopyWithImpl<$Res>
 
 /// Create a copy of RoomModel
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? roomId = null,Object? name = null,Object? status = null,Object? memberCount = null,Object? createdBy = null,Object? createdAt = freezed,Object? getstreamCallId = null,Object? description = freezed,Object? hostId = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? roomId = null,Object? name = null,Object? status = null,Object? memberCount = null,Object? createdBy = null,Object? createdAt = freezed,Object? getstreamCallId = null,Object? description = freezed,Object? hostId = freezed,Object? banners = null,Object? marqueeText = freezed,}) {
   return _then(_RoomModel(
 roomId: null == roomId ? _self.roomId : roomId // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -291,6 +301,8 @@ as String,createdAt: freezed == createdAt ? _self.createdAt : createdAt // ignor
 as DateTime?,getstreamCallId: null == getstreamCallId ? _self.getstreamCallId : getstreamCallId // ignore: cast_nullable_to_non_nullable
 as String,description: freezed == description ? _self.description : description // ignore: cast_nullable_to_non_nullable
 as String?,hostId: freezed == hostId ? _self.hostId : hostId // ignore: cast_nullable_to_non_nullable
+as String?,banners: null == banners ? _self._banners : banners // ignore: cast_nullable_to_non_nullable
+as List<String>,marqueeText: freezed == marqueeText ? _self.marqueeText : marqueeText // ignore: cast_nullable_to_non_nullable
 as String?,
   ));
 }

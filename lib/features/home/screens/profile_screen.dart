@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../domain/enums/user_role.dart';
 import '../../../shared/widgets/uuid_display_card.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../shell/widgets/floating_pill_navbar.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -24,13 +25,15 @@ class ProfileScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         title: const Text('Profile'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        automaticallyImplyLeading: false,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(
+          24,
+          24,
+          24,
+          FloatingPillNavBar.bottomPadding(context) + 24,
+        ),
         child: Column(
           children: [
             const SizedBox(height: 16),

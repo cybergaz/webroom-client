@@ -11,24 +11,38 @@ class AuthRepositoryImpl implements AuthRepository {
   AuthRepositoryImpl(this._datasource, this._storage);
 
   @override
-  Future<String> signup({required String name, required String password, String? phone, String? email}) async {
+  Future<AuthSession> signup({
+    required String name,
+    required String password,
+    String? phone,
+    String? email,
+  }) async {
     final data = await _datasource.signup(name: name, password: password, phone: phone, email: email);
-    return data['requestId'] as String;
+    return _persistSession(data);
   }
 
   @override
-  Future<String> checkStatus(String requestId) async {
-    final data = await _datasource.checkStatus(requestId);
-    return data['status'] as String;
-  }
-
-  @override
-  Future<({UserModel user, String accessToken, String refreshToken, String getstreamToken})> login({
+  Future<AuthSession> login({
     String? phone,
     String? email,
     required String password,
   }) async {
     final data = await _datasource.login(phone: phone, email: email, password: password);
+    return _persistSession(data);
+  }
+
+  @override
+  Future<void> logout() async {
+    try {
+      final refreshToken = await _storage.read(StorageKeys.refreshToken);
+      if (refreshToken != null) {
+        await _datasource.logout(refreshToken);
+      }
+    } catch (_) {}
+    await _storage.deleteAll();
+  }
+
+  Future<AuthSession> _persistSession(Map<String, dynamic> data) async {
     final user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
     final accessToken = data['accessToken'] as String;
     final refreshToken = data['refreshToken'] as String;
@@ -45,16 +59,5 @@ class AuthRepositoryImpl implements AuthRepository {
     if (user.requestId != null) await _storage.write(StorageKeys.requestId, user.requestId!);
 
     return (user: user, accessToken: accessToken, refreshToken: refreshToken, getstreamToken: getstreamToken);
-  }
-
-  @override
-  Future<void> logout() async {
-    try {
-      final refreshToken = await _storage.read(StorageKeys.refreshToken);
-      if (refreshToken != null) {
-        await _datasource.logout(refreshToken);
-      }
-    } catch (_) {}
-    await _storage.deleteAll();
   }
 }

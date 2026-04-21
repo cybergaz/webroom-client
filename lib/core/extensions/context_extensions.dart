@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../shared/widgets/app_snackbar.dart';
+
 extension ContextExtensions on BuildContext {
   ThemeData get theme => Theme.of(this);
   ColorScheme get colorScheme => Theme.of(this).colorScheme;
@@ -9,12 +11,6 @@ extension ContextExtensions on BuildContext {
   double get screenHeight => MediaQuery.of(this).size.height;
 
   void showSnackBar(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(this).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? const Color(0xFFFF4B4B) : const Color(0xFF6C63FF),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppSnackBar.show(this, message: message, isError: isError);
   }
 }

@@ -4,23 +4,22 @@ import 'package:go_router/go_router.dart';
 import 'package:webroom_client/features/home/screens/home_screen.dart';
 import 'package:webroom_client/features/home/screens/profile_screen.dart';
 import '../../features/recordings/screens/recordings_screen.dart';
+import '../../features/session_history/screens/session_history_screen.dart';
+import '../../features/settings/screens/settings_screen.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/signup_screen.dart';
-import '../../features/auth/screens/signup_success_screen.dart';
-import '../../features/auth/screens/check_status_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/room/screens/user_room_screen.dart';
 import '../../features/room/screens/admin_room_screen.dart';
 import '../../features/room/screens/room_members_screen.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/shell/widgets/app_shell.dart';
 import '../../domain/enums/user_role.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   const publicPaths = [
     '/login',
     '/signup',
-    '/signup/success',
-    '/check-status',
     '/splash',
   ];
 
@@ -43,12 +42,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         AuthStateUnauthenticated() => () {
           if (publicPaths.any((p) => path.startsWith(p))) return null;
           return '/login';
-        }(),
-
-        AuthStatePendingApproval() => () {
-          const allowed = ['/signup/success', '/check-status', '/login'];
-          if (allowed.contains(path)) return null;
-          return '/signup/success';
         }(),
 
         AuthStateAuthenticated() => () {
@@ -74,41 +67,41 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/signup',
         name: 'signup',
         builder: (context, state) => const SignupScreen(),
-        routes: [
-          GoRoute(
-            path: 'success',
-            name: 'signup-success',
-            builder: (context, state) {
-              final requestId = state.extra as String?;
-              return SignupSuccessScreen(requestId: requestId ?? '');
-            },
-          ),
-        ],
-      ),
-      GoRoute(
-        path: '/check-status',
-        name: 'check-status',
-        builder: (context, state) => const CheckStatusScreen(),
       ),
       GoRoute(
         path: '/login',
         name: 'login',
         builder: (context, state) => const LoginScreen(),
       ),
-      GoRoute(
-        path: '/home',
-        name: 'home',
-        builder: (context, state) => const HomeScreen(),
-      ),
-      GoRoute(
-        path: '/profile',
-        name: 'profile',
-        builder: (context, state) => const ProfileScreen(),
-      ),
-      GoRoute(
-        path: '/recordings',
-        name: 'recordings',
-        builder: (context, state) => const RecordingsScreen(),
+      ShellRoute(
+        builder: (context, state, child) => AppShell(child: child),
+        routes: [
+          GoRoute(
+            path: '/home',
+            name: 'home',
+            builder: (context, state) => const HomeScreen(),
+          ),
+          GoRoute(
+            path: '/profile',
+            name: 'profile',
+            builder: (context, state) => const ProfileScreen(),
+          ),
+          GoRoute(
+            path: '/recordings',
+            name: 'recordings',
+            builder: (context, state) => const RecordingsScreen(),
+          ),
+          GoRoute(
+            path: '/session-history',
+            name: 'session-history',
+            builder: (context, state) => const SessionHistoryScreen(),
+          ),
+          GoRoute(
+            path: '/settings',
+            name: 'settings',
+            builder: (context, state) => const SettingsScreen(),
+          ),
+        ],
       ),
       GoRoute(
         path: '/room/:roomId',

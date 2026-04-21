@@ -50,11 +50,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       _error = null;
     });
     try {
-      final requestId = await ref
+      await ref
           .read(authStateProvider.notifier)
           .signup(name: _nameController.text, password: _passwordController.text, phone: phone, email: email);
       if (!mounted) return;
-      context.go('/signup/success', extra: requestId);
+      context.go('/home');
     } catch (e) {
       setState(() => _error = mapErrorToMessage(e));
     } finally {
@@ -96,7 +96,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1),
                     const SizedBox(height: 8),
                     const Text(
-                      'Request access to audio rooms',
+                      'Create your account to get started',
                       style: TextStyle(color: AppColors.textSecondary),
                     ).animate().fadeIn(delay: 80.ms, duration: 300.ms).slideY(begin: 0.1),
                     const SizedBox(height: 32),
@@ -162,20 +162,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ],
                     const SizedBox(height: 32),
                     AuthButton(
-                      label: 'Request Access',
+                      label: 'Create Account',
                       isLoading: _isLoading,
                       onPressed: _submit,
                     ).animate().fadeIn(delay: 480.ms, duration: 300.ms),
-                    const SizedBox(height: 16),
-                    Center(
-                      child: TextButton(
-                        onPressed: () => context.push('/check-status'),
-                        child: const Text(
-                          'Already registered? Check status',
-                          style: TextStyle(color: AppColors.accent),
-                        ),
-                      ),
-                    ).animate().fadeIn(delay: 560.ms, duration: 300.ms),
                   ],
                 ),
               ),

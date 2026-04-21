@@ -265,18 +265,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ],
                     ).animate().fadeIn(delay: 480.ms, duration: 300.ms),
-                    Center(
-                      child: TextButton(
-                        onPressed: () => context.push('/check-status'),
-                        child: const Text(
-                          'Check account status',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ).animate().fadeIn(delay: 560.ms, duration: 300.ms),
                   ],
                 ),
               ),

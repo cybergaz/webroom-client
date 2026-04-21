@@ -16,6 +16,7 @@ import 'call_participants_screen.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/utils/error_mapper.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 
 class AdminRoomScreen extends ConsumerStatefulWidget {
   final String roomId;
@@ -102,11 +103,11 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
         error: (e, _) {
           if (mounted) {
             final message = mapErrorToMessage(e);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(message),
-                duration: const Duration(seconds: 5),
-              ),
+            AppSnackBar.show(
+              context,
+              message: message,
+              isError: true,
+              duration: const Duration(seconds: 5),
             );
             context.go('/home');
           }

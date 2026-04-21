@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/rooms_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/error_mapper.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 
 class CreateRoomSheet extends ConsumerStatefulWidget {
   const CreateRoomSheet({super.key});
@@ -80,8 +81,10 @@ class _CreateRoomSheetState extends ConsumerState<CreateRoomSheet> {
                         if (context.mounted) Navigator.pop(context);
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(mapErrorToMessage(e))),
+                          AppSnackBar.show(
+                            context,
+                            message: mapErrorToMessage(e),
+                            isError: true,
                           );
                         }
                       } finally {

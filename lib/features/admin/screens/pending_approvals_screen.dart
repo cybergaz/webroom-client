@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/user_management_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/error_mapper.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 
 class PendingApprovalsScreen extends ConsumerWidget {
   const PendingApprovalsScreen({super.key});
@@ -105,8 +106,10 @@ class PendingApprovalsScreen extends ConsumerWidget {
                                   await ref.read(pendingUsersProvider.notifier).rejectUser(userId);
                                 } catch (e) {
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(mapErrorToMessage(e))),
+                                    AppSnackBar.show(
+                                      context,
+                                      message: mapErrorToMessage(e),
+                                      isError: true,
                                     );
                                   }
                                 }
@@ -125,14 +128,17 @@ class PendingApprovalsScreen extends ConsumerWidget {
                                 try {
                                   await ref.read(pendingUsersProvider.notifier).approveUser(userId);
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('User approved')),
+                                    AppSnackBar.show(
+                                      context,
+                                      message: 'User approved',
                                     );
                                   }
                                 } catch (e) {
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(mapErrorToMessage(e))),
+                                    AppSnackBar.show(
+                                      context,
+                                      message: mapErrorToMessage(e),
+                                      isError: true,
                                     );
                                   }
                                 }

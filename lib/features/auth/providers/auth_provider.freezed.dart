@@ -12,11 +12,17 @@ part of 'auth_provider.dart';
 // dart format off
 T _$identity<T>(T value) => value;
 /// @nodoc
-mixin _$AuthState {
+mixin _$AuthState implements DiagnosticableTreeMixin {
 
 
 
 
+@override
+void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+  properties
+    ..add(DiagnosticsProperty('type', 'AuthState'))
+    ;
+}
 
 @override
 bool operator ==(Object other) {
@@ -28,7 +34,7 @@ bool operator ==(Object other) {
 int get hashCode => runtimeType.hashCode;
 
 @override
-String toString() {
+String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
   return 'AuthState()';
 }
 
@@ -55,15 +61,14 @@ extension AuthStatePatterns on AuthState {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( AuthStateInitial value)?  initial,TResult Function( AuthStateLoading value)?  loading,TResult Function( AuthStateAuthenticated value)?  authenticated,TResult Function( AuthStateUnauthenticated value)?  unauthenticated,TResult Function( AuthStatePendingApproval value)?  pendingApproval,required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( AuthStateInitial value)?  initial,TResult Function( AuthStateLoading value)?  loading,TResult Function( AuthStateAuthenticated value)?  authenticated,TResult Function( AuthStateUnauthenticated value)?  unauthenticated,required TResult orElse(),}){
 final _that = this;
 switch (_that) {
 case AuthStateInitial() when initial != null:
 return initial(_that);case AuthStateLoading() when loading != null:
 return loading(_that);case AuthStateAuthenticated() when authenticated != null:
 return authenticated(_that);case AuthStateUnauthenticated() when unauthenticated != null:
-return unauthenticated(_that);case AuthStatePendingApproval() when pendingApproval != null:
-return pendingApproval(_that);case _:
+return unauthenticated(_that);case _:
   return orElse();
 
 }
@@ -81,15 +86,14 @@ return pendingApproval(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( AuthStateInitial value)  initial,required TResult Function( AuthStateLoading value)  loading,required TResult Function( AuthStateAuthenticated value)  authenticated,required TResult Function( AuthStateUnauthenticated value)  unauthenticated,required TResult Function( AuthStatePendingApproval value)  pendingApproval,}){
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( AuthStateInitial value)  initial,required TResult Function( AuthStateLoading value)  loading,required TResult Function( AuthStateAuthenticated value)  authenticated,required TResult Function( AuthStateUnauthenticated value)  unauthenticated,}){
 final _that = this;
 switch (_that) {
 case AuthStateInitial():
 return initial(_that);case AuthStateLoading():
 return loading(_that);case AuthStateAuthenticated():
 return authenticated(_that);case AuthStateUnauthenticated():
-return unauthenticated(_that);case AuthStatePendingApproval():
-return pendingApproval(_that);}
+return unauthenticated(_that);}
 }
 /// A variant of `map` that fallback to returning `null`.
 ///
@@ -103,15 +107,14 @@ return pendingApproval(_that);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( AuthStateInitial value)?  initial,TResult? Function( AuthStateLoading value)?  loading,TResult? Function( AuthStateAuthenticated value)?  authenticated,TResult? Function( AuthStateUnauthenticated value)?  unauthenticated,TResult? Function( AuthStatePendingApproval value)?  pendingApproval,}){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( AuthStateInitial value)?  initial,TResult? Function( AuthStateLoading value)?  loading,TResult? Function( AuthStateAuthenticated value)?  authenticated,TResult? Function( AuthStateUnauthenticated value)?  unauthenticated,}){
 final _that = this;
 switch (_that) {
 case AuthStateInitial() when initial != null:
 return initial(_that);case AuthStateLoading() when loading != null:
 return loading(_that);case AuthStateAuthenticated() when authenticated != null:
 return authenticated(_that);case AuthStateUnauthenticated() when unauthenticated != null:
-return unauthenticated(_that);case AuthStatePendingApproval() when pendingApproval != null:
-return pendingApproval(_that);case _:
+return unauthenticated(_that);case _:
   return null;
 
 }
@@ -128,14 +131,13 @@ return pendingApproval(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  initial,TResult Function()?  loading,TResult Function( UserModel user)?  authenticated,TResult Function()?  unauthenticated,TResult Function( String? requestId)?  pendingApproval,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  initial,TResult Function()?  loading,TResult Function( UserModel user)?  authenticated,TResult Function()?  unauthenticated,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case AuthStateInitial() when initial != null:
 return initial();case AuthStateLoading() when loading != null:
 return loading();case AuthStateAuthenticated() when authenticated != null:
 return authenticated(_that.user);case AuthStateUnauthenticated() when unauthenticated != null:
-return unauthenticated();case AuthStatePendingApproval() when pendingApproval != null:
-return pendingApproval(_that.requestId);case _:
+return unauthenticated();case _:
   return orElse();
 
 }
@@ -153,14 +155,13 @@ return pendingApproval(_that.requestId);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  initial,required TResult Function()  loading,required TResult Function( UserModel user)  authenticated,required TResult Function()  unauthenticated,required TResult Function( String? requestId)  pendingApproval,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  initial,required TResult Function()  loading,required TResult Function( UserModel user)  authenticated,required TResult Function()  unauthenticated,}) {final _that = this;
 switch (_that) {
 case AuthStateInitial():
 return initial();case AuthStateLoading():
 return loading();case AuthStateAuthenticated():
 return authenticated(_that.user);case AuthStateUnauthenticated():
-return unauthenticated();case AuthStatePendingApproval():
-return pendingApproval(_that.requestId);}
+return unauthenticated();}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -174,14 +175,13 @@ return pendingApproval(_that.requestId);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  initial,TResult? Function()?  loading,TResult? Function( UserModel user)?  authenticated,TResult? Function()?  unauthenticated,TResult? Function( String? requestId)?  pendingApproval,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  initial,TResult? Function()?  loading,TResult? Function( UserModel user)?  authenticated,TResult? Function()?  unauthenticated,}) {final _that = this;
 switch (_that) {
 case AuthStateInitial() when initial != null:
 return initial();case AuthStateLoading() when loading != null:
 return loading();case AuthStateAuthenticated() when authenticated != null:
 return authenticated(_that.user);case AuthStateUnauthenticated() when unauthenticated != null:
-return unauthenticated();case AuthStatePendingApproval() when pendingApproval != null:
-return pendingApproval(_that.requestId);case _:
+return unauthenticated();case _:
   return null;
 
 }
@@ -192,7 +192,7 @@ return pendingApproval(_that.requestId);case _:
 /// @nodoc
 
 
-class AuthStateInitial implements AuthState {
+class AuthStateInitial with DiagnosticableTreeMixin implements AuthState {
   const AuthStateInitial();
   
 
@@ -200,6 +200,12 @@ class AuthStateInitial implements AuthState {
 
 
 
+@override
+void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+  properties
+    ..add(DiagnosticsProperty('type', 'AuthState.initial'))
+    ;
+}
 
 @override
 bool operator ==(Object other) {
@@ -211,7 +217,7 @@ bool operator ==(Object other) {
 int get hashCode => runtimeType.hashCode;
 
 @override
-String toString() {
+String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
   return 'AuthState.initial()';
 }
 
@@ -224,7 +230,7 @@ String toString() {
 /// @nodoc
 
 
-class AuthStateLoading implements AuthState {
+class AuthStateLoading with DiagnosticableTreeMixin implements AuthState {
   const AuthStateLoading();
   
 
@@ -232,6 +238,12 @@ class AuthStateLoading implements AuthState {
 
 
 
+@override
+void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+  properties
+    ..add(DiagnosticsProperty('type', 'AuthState.loading'))
+    ;
+}
 
 @override
 bool operator ==(Object other) {
@@ -243,7 +255,7 @@ bool operator ==(Object other) {
 int get hashCode => runtimeType.hashCode;
 
 @override
-String toString() {
+String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
   return 'AuthState.loading()';
 }
 
@@ -256,7 +268,7 @@ String toString() {
 /// @nodoc
 
 
-class AuthStateAuthenticated implements AuthState {
+class AuthStateAuthenticated with DiagnosticableTreeMixin implements AuthState {
   const AuthStateAuthenticated({required this.user});
   
 
@@ -269,6 +281,12 @@ class AuthStateAuthenticated implements AuthState {
 $AuthStateAuthenticatedCopyWith<AuthStateAuthenticated> get copyWith => _$AuthStateAuthenticatedCopyWithImpl<AuthStateAuthenticated>(this, _$identity);
 
 
+@override
+void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+  properties
+    ..add(DiagnosticsProperty('type', 'AuthState.authenticated'))
+    ..add(DiagnosticsProperty('user', user));
+}
 
 @override
 bool operator ==(Object other) {
@@ -280,7 +298,7 @@ bool operator ==(Object other) {
 int get hashCode => Object.hash(runtimeType,user);
 
 @override
-String toString() {
+String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
   return 'AuthState.authenticated(user: $user)';
 }
 
@@ -331,7 +349,7 @@ $UserModelCopyWith<$Res> get user {
 /// @nodoc
 
 
-class AuthStateUnauthenticated implements AuthState {
+class AuthStateUnauthenticated with DiagnosticableTreeMixin implements AuthState {
   const AuthStateUnauthenticated();
   
 
@@ -339,6 +357,12 @@ class AuthStateUnauthenticated implements AuthState {
 
 
 
+@override
+void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+  properties
+    ..add(DiagnosticsProperty('type', 'AuthState.unauthenticated'))
+    ;
+}
 
 @override
 bool operator ==(Object other) {
@@ -350,7 +374,7 @@ bool operator ==(Object other) {
 int get hashCode => runtimeType.hashCode;
 
 @override
-String toString() {
+String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
   return 'AuthState.unauthenticated()';
 }
 
@@ -359,71 +383,5 @@ String toString() {
 
 
 
-
-/// @nodoc
-
-
-class AuthStatePendingApproval implements AuthState {
-  const AuthStatePendingApproval({this.requestId});
-  
-
- final  String? requestId;
-
-/// Create a copy of AuthState
-/// with the given fields replaced by the non-null parameter values.
-@JsonKey(includeFromJson: false, includeToJson: false)
-@pragma('vm:prefer-inline')
-$AuthStatePendingApprovalCopyWith<AuthStatePendingApproval> get copyWith => _$AuthStatePendingApprovalCopyWithImpl<AuthStatePendingApproval>(this, _$identity);
-
-
-
-@override
-bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AuthStatePendingApproval&&(identical(other.requestId, requestId) || other.requestId == requestId));
-}
-
-
-@override
-int get hashCode => Object.hash(runtimeType,requestId);
-
-@override
-String toString() {
-  return 'AuthState.pendingApproval(requestId: $requestId)';
-}
-
-
-}
-
-/// @nodoc
-abstract mixin class $AuthStatePendingApprovalCopyWith<$Res> implements $AuthStateCopyWith<$Res> {
-  factory $AuthStatePendingApprovalCopyWith(AuthStatePendingApproval value, $Res Function(AuthStatePendingApproval) _then) = _$AuthStatePendingApprovalCopyWithImpl;
-@useResult
-$Res call({
- String? requestId
-});
-
-
-
-
-}
-/// @nodoc
-class _$AuthStatePendingApprovalCopyWithImpl<$Res>
-    implements $AuthStatePendingApprovalCopyWith<$Res> {
-  _$AuthStatePendingApprovalCopyWithImpl(this._self, this._then);
-
-  final AuthStatePendingApproval _self;
-  final $Res Function(AuthStatePendingApproval) _then;
-
-/// Create a copy of AuthState
-/// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') $Res call({Object? requestId = freezed,}) {
-  return _then(AuthStatePendingApproval(
-requestId: freezed == requestId ? _self.requestId : requestId // ignore: cast_nullable_to_non_nullable
-as String?,
-  ));
-}
-
-
-}
 
 // dart format on

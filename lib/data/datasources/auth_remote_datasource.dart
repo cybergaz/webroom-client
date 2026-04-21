@@ -20,11 +20,6 @@ class AuthRemoteDatasource {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> checkStatus(String requestId) async {
-    final response = await _dio.get('/auth/status', queryParameters: {'requestId': requestId});
-    return response.data as Map<String, dynamic>;
-  }
-
   Future<Map<String, dynamic>> login({
     String? phone,
     String? email,

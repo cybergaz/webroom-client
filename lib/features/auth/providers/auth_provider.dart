@@ -20,8 +20,6 @@ sealed class AuthState with _$AuthState {
   const factory AuthState.authenticated({required UserModel user}) =
       AuthStateAuthenticated;
   const factory AuthState.unauthenticated() = AuthStateUnauthenticated;
-  const factory AuthState.pendingApproval({String? requestId}) =
-      AuthStatePendingApproval;
 }
 
 class AuthNotifier extends Notifier<AuthState> {
@@ -40,12 +38,6 @@ class AuthNotifier extends Notifier<AuthState> {
 
     if (token == null) {
       state = const AuthState.unauthenticated();
-      return;
-    }
-
-    if (userStatus == 'pending_approval') {
-      final requestId = await storage.read(StorageKeys.requestId);
-      state = AuthState.pendingApproval(requestId: requestId);
       return;
     }
 
@@ -94,27 +86,24 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
-  Future<String> signup({
+  Future<void> signup({
     required String name,
     required String password,
     String? phone,
     String? email,
   }) async {
+    state = const AuthState.loading();
     final repo = AuthRepositoryImpl(
       AuthRemoteDatasource(ref.read(dioClientProvider)),
       ref.read(secureStorageProvider),
     );
-    final requestId = await repo.signup(
+    final result = await repo.signup(
       name: name,
       password: password,
       phone: phone,
       email: email,
     );
-    final storage = ref.read(secureStorageProvider);
-    await storage.write(StorageKeys.userStatus, 'pending_approval');
-    await storage.write(StorageKeys.requestId, requestId);
-    state = AuthState.pendingApproval(requestId: requestId);
-    return requestId;
+    await _completeSession(result);
   }
 
   Future<void> login({
@@ -132,13 +121,16 @@ class AuthNotifier extends Notifier<AuthState> {
       email: email,
       password: password,
     );
+    await _completeSession(result);
+  }
 
-    // Persist user name for StreamVideo re-init on next app launch
+  Future<void> _completeSession(
+    ({UserModel user, String accessToken, String refreshToken, String getstreamToken}) result,
+  ) async {
     await ref
         .read(secureStorageProvider)
         .write(StorageKeys.userName, result.user.name);
 
-    // Initialize GetStream SDK for this user
     await ref
         .read(getstreamStateProvider.notifier)
         .init(

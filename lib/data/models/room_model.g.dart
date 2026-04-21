@@ -18,6 +18,10 @@ _RoomModel _$RoomModelFromJson(Map<String, dynamic> json) => _RoomModel(
   getstreamCallId: json['getstreamCallId'] as String,
   description: json['description'] as String?,
   hostId: json['hostId'] as String?,
+  banners:
+      (json['banners'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+      const <String>[],
+  marqueeText: json['marqueeText'] as String?,
 );
 
 Map<String, dynamic> _$RoomModelToJson(_RoomModel instance) =>
@@ -31,6 +35,8 @@ Map<String, dynamic> _$RoomModelToJson(_RoomModel instance) =>
       'getstreamCallId': instance.getstreamCallId,
       'description': instance.description,
       'hostId': instance.hostId,
+      'banners': instance.banners,
+      'marqueeText': instance.marqueeText,
     };
 
 const _$RoomStatusEnumMap = {

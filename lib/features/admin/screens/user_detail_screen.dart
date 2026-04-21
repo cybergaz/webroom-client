@@ -6,6 +6,7 @@ import '../../../core/utils/error_mapper.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../data/datasources/user_remote_datasource.dart';
 import '../../../data/repositories/user_repository_impl.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 
 class UserDetailScreen extends ConsumerWidget {
   final String userId;
@@ -63,14 +64,17 @@ class UserDetailScreen extends ConsumerWidget {
                       final repo = UserRepositoryImpl(UserRemoteDatasource(ref.read(dioClientProvider)));
                       await repo.forceLogout(userId);
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('User logged out')),
+                        AppSnackBar.show(
+                          context,
+                          message: 'User logged out',
                         );
                       }
                     } catch (e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(mapErrorToMessage(e))),
+                        AppSnackBar.show(
+                          context,
+                          message: mapErrorToMessage(e),
+                          isError: true,
                         );
                       }
                     }

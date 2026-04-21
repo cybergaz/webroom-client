@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/odds_models.dart';
 import '../providers/odds_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 
 class MarketOddsBox extends ConsumerWidget {
   const MarketOddsBox({super.key});
@@ -19,11 +20,11 @@ class MarketOddsBox extends ConsumerWidget {
       if (oddsState.error != null) {
         // Show error then clear it
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(oddsState.error!),
-              duration: const Duration(seconds: 3),
-            ),
+          AppSnackBar.show(
+            context,
+            message: oddsState.error!,
+            isError: true,
+            duration: const Duration(seconds: 3),
           );
           ref.read(oddsProvider.notifier).clearError();
         });

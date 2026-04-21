@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:stream_video/stream_video.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 
 /// Full-screen participant list with host moderation controls
 /// (mute, kick, block).
@@ -33,8 +34,9 @@ class CallParticipantsScreen extends StatelessWidget {
             onPressed: () async {
               await call.muteAllUsers();
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('All participants muted')),
+                AppSnackBar.show(
+                  context,
+                  message: 'All participants muted',
                 );
               }
             },
@@ -241,9 +243,7 @@ class _ParticipantTile extends StatelessWidget {
       case 'mute':
         await call.muteUsers(userIds: [participant.userId]);
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$name muted')),
-          );
+          AppSnackBar.show(context, message: '$name muted');
         }
 
       case 'kick':

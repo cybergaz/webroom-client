@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/clipboard_util.dart';
+import 'app_snackbar.dart';
 
 class UuidDisplayCard extends StatelessWidget {
   final String uuid;
@@ -44,8 +45,9 @@ class UuidDisplayCard extends StatelessWidget {
                 onPressed: () async {
                   await ClipboardUtil.copy(uuid);
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Copied to clipboard')),
+                    AppSnackBar.show(
+                      context,
+                      message: 'Copied to clipboard',
                     );
                   }
                 },

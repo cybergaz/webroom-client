@@ -35,9 +35,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       case AuthStateAuthenticated():
         _navigated = true;
         context.go('/home');
-      case AuthStatePendingApproval():
-        _navigated = true;
-        context.go('/signup/success');
       case AuthStateUnauthenticated():
         _navigated = true;
         context.go('/login');

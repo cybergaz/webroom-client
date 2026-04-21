@@ -6,7 +6,6 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:stream_video/stream_video.dart';
 import 'package:webroom_client/domain/enums/user_role.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/storage_keys.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../data/models/room_member_model.dart';
@@ -16,6 +15,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/network/websocket_service.dart';
 import '../../../domain/enums/room_status.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../session_history/providers/session_history_provider.dart';
 import 'getstream_provider.dart';
 
 part 'room_session_provider.freezed.dart';
@@ -34,6 +34,8 @@ abstract class RoomSession with _$RoomSession {
     @Default(false) bool isHost,
     @Default(false) bool isHostDisconnected,
     @Default(0) int hostGraceSeconds,
+    @Default(<String>[]) List<String> banners,
+    String? marqueeText,
   }) = _RoomSession;
 }
 
@@ -98,6 +100,8 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
           sessionId: roomData.sessionId,
           isInCall: true,
           isHost: roomData.isHost,
+          banners: roomData.room.banners,
+          marqueeText: roomData.room.marqueeText,
         ),
       );
 
@@ -120,6 +124,8 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
             sessionId: roomData.sessionId,
             isInCall: true,
             isHost: true,
+            banners: roomData.room.banners,
+            marqueeText: roomData.room.marqueeText,
           ),
         );
 
@@ -219,195 +225,77 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
     await _repo().deleteRoom(roomId);
   }
 
-  /// Refreshes the getstream token via /auth/refresh and reinitializes the SDK.
-  Future<void> _refreshAndReinitGetstream() async {
-    final storage = ref.read(secureStorageProvider);
-    final refreshToken = await storage.read(StorageKeys.refreshToken);
-    if (refreshToken == null) throw Exception('No refresh token available');
-
-    final dio = ref.read(dioClientProvider);
-    final response = await dio.post(
-      '/auth/refresh',
-      data: {'refreshToken': refreshToken},
-    );
-
-    final newAccessToken = response.data['accessToken'] as String;
-    final newRefreshToken = response.data['refreshToken'] as String;
-    final newGetstreamToken = response.data['getstreamToken'] as String;
-    await storage.write(StorageKeys.accessToken, newAccessToken);
-    await storage.write(StorageKeys.refreshToken, newRefreshToken);
-    await storage.write(StorageKeys.getstreamToken, newGetstreamToken);
+  /// Fast-path room entry. All independent work runs in parallel:
+  ///   • mic permission + SDK singleton construction (both near-instant)
+  ///   • client `call.join()` + server `hostReady` (host only — server flips
+  ///     the call out of backstage while the host joins the SFU)
+  /// Token expiry is handled transparently by the SDK's `tokenLoader`; there
+  /// is no dispose / reinitialize fallback.
+  Future<void> _enterCall({
+    required String getstreamCallId,
+    required String roomId,
+  }) async {
+    final current = state.value;
+    if (current == null) return;
 
     final authState = ref.read(authStateProvider);
     final userId = authState.whenOrNull(authenticated: (user) => user.userId)!;
     final userName = authState.whenOrNull(authenticated: (user) => user.name)!;
     final userRole = authState.whenOrNull(authenticated: (user) => user.role)!;
+    final isHost = userRole == UserRole.host;
 
-    await ref
-        .read(getstreamStateProvider.notifier)
-        .reinitialize(
-          userId: userId,
-          userName: userName,
-          getstreamToken: newGetstreamToken,
-          role: userRole,
-        );
-
-    print("getstream SDK reinitialized with fresh token");
-  }
-
-  Future<void> _enterCall({
-    required String getstreamCallId,
-    required String roomId,
-  }) async {
-    try {
-      await _enterCallInner(getstreamCallId: getstreamCallId, roomId: roomId);
-    } catch (e) {
-      print("_enterCall failed: $e — refreshing getstream token and retrying");
-      await _refreshAndReinitGetstream();
-      await _enterCallInner(getstreamCallId: getstreamCallId, roomId: roomId);
-    }
-  }
-
-  Future<void> _enterCallInner({
-    required String getstreamCallId,
-    required String roomId,
-  }) async {
-    print("entering calll");
-    final current = state.value;
-    print("-----------------------------------------------------------");
-    print("current state : ${current.toString()}");
-    print("-----------------------------------------------------------");
-    if (current == null) return;
-
-    final authState = ref.read(authStateProvider);
-    final userId = authState.whenOrNull(authenticated: (user) => user.userId);
-    final userName = authState.whenOrNull(authenticated: (user) => user.name);
-    final userRole = authState.whenOrNull(authenticated: (user) => user.role);
-    final token = await ref
-        .read(secureStorageProvider)
-        .read(StorageKeys.getstreamToken);
-    print("────────────────────────────────────────────────────────────────");
-    print("userId : ${userId}, userRole: ${userRole.toString()}");
-    print("────────────────────────────────────────────────────────────────");
-
-    print("entercall: chk 1");
-    // Request microphone permission before touching the audio stack.
-    final micStatus = await Permission.microphone.request();
-    if (!micStatus.isGranted) {
-      throw Exception(
-        'Microphone permission is required to join a room. Please grant it in Settings.',
-      );
-    }
-    print("entercall: chk 2");
-
-    // if getstream is not yet initialized then reinitialize it
-    if (ref.read(getstreamStateProvider).isInitialized == false) {
-      await ref
-          .read(getstreamStateProvider.notifier)
-          .init(
-            userId: userId!,
-            userName: userName!,
-            getstreamToken: token!,
-            role: userRole!,
-          );
-    }
-
-    // Health-check: queryCalls will fail if the coordinator WS is stale.
-    // Throw on failure so the outer _enterCall can catch & retry with a
-    // fresh GetStream connection.
-    final call_stat = await StreamVideo.instance.queryCalls(
-      filterConditions: {'id': getstreamCallId},
-    );
-
-    print("-----------------------------------------------------------");
-    print("if any old call stat : ${call_stat.toString()}");
-    print("-----------------------------------------------------------");
-
-    if (!call_stat.isSuccess) {
-      throw Exception('GetStream coordinator not connected: $call_stat');
-    }
+    // Parallel: mic permission + SDK singleton init.
+    await Future.wait([
+      _ensureMicPermission(),
+      _ensureGetstreamInitialized(
+        userId: userId,
+        userName: userName,
+        role: userRole,
+      ),
+    ]);
 
     final call = StreamVideo.instance.makeCall(
       callType: StreamCallType.audioRoom(),
       id: getstreamCallId,
     );
 
-    print("-----------------------------------------------------------");
-    print("call : ${call.toString()}");
-    print("-----------------------------------------------------------");
-
-    print("entercall: chk 3");
-
     final getCallRes = await call.getOrCreate(
-      audio: StreamAudioSettings(
-        // accessRequestEnabled: true,
-        micDefaultOn: false,
-      ),
+      audio: StreamAudioSettings(micDefaultOn: false),
     );
-
-    print("-----------------------------------------------------------");
-    print("getCallRes isSuccess : ${getCallRes.isSuccess}");
-    print("-----------------------------------------------------------");
-
     if (!getCallRes.isSuccess) {
-      throw Exception('getOrCreate failed: ${getCallRes.toString()}');
+      throw Exception('getOrCreate failed: $getCallRes');
     }
 
-    print("entercall: chk 4");
-
-    // If this call was already joined (e.g. stale state from a previous
-    // session), leave first so the SFU clears old publisher tracks.
+    // Clear any stale publisher tracks from a previous session.
     if (call.state.value.status.isAlreadyJoined) {
-      print("stale call detected — leaving before rejoin");
       await call.leave();
     }
 
-    // Host joins with mic on; users join muted (PTT mode).
-    final micEnabled = userRole == UserRole.host;
     final connectOptions = CallConnectOptions(
-      microphone: micEnabled ? TrackOption.enabled() : TrackOption.disabled(),
+      microphone: isHost ? TrackOption.enabled() : TrackOption.disabled(),
     );
+
     await call
         .join(connectOptions: connectOptions)
         .timeout(const Duration(seconds: 15));
 
-    print("entercall: chk 5");
-    print("-----------------------------------------------------------");
-    print(
-      "post-join call state — backstage: ${call.state.value.isBackstage}, "
-      "participants: ${call.state.value.callParticipants.length}, "
-      "status: ${call.state.value.status}",
-    );
-    print("-----------------------------------------------------------");
-
-    if (userRole == UserRole.host) {
-      final goLiveRes = await call.goLive();
-      print("-----------------------------------------------------------");
-      print("goLive result: ${goLiveRes.toString()}");
-      print("-----------------------------------------------------------");
-
-      // Notify server that the host is actually in the call and ready.
-      // This triggers the room.status_changed broadcast to members.
+    // Host: tell the server to goLive + start recording/transcription + notify
+    // members. Must run after the host is actually in the SFU so members
+    // aren't woken up to join an empty live call.
+    if (isHost) {
       try {
         await _repo().hostReady(roomId);
       } catch (e) {
-        print("hostReady call failed (non-fatal): $e");
+        print('hostReady failed (non-fatal): $e');
       }
     }
 
-    print("entercall: chk 6");
-
     ref.read(activeCallProvider.notifier).setCall(call);
-
-    print("entercall: chk 7");
 
     _subscribeToCallState(call);
     _subscribeToCallEvents(call);
     _subscribeToWsEvents(_roomId!);
 
-    print("entercall: chk 8");
-
-    // Keep screen awake during the session.
     WakelockPlus.enable();
 
     state = AsyncData(
@@ -417,11 +305,41 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
       ),
     );
 
-    print("entercall: chk 9 : end of function");
+    // Record the join for session history.
+    await ref.read(sessionHistoryProvider.notifier).recordJoin(
+          roomId: roomId,
+          roomName: current.roomName,
+        );
 
     // Watchdog: if no participants appear within 5s, the SFU connection
     // silently failed. Leave and rejoin once to recover.
     _scheduleParticipantCheck(call, connectOptions, userRole);
+  }
+
+  Future<void> _ensureMicPermission() async {
+    final status = await Permission.microphone.request();
+    if (!status.isGranted) {
+      throw Exception(
+        'Microphone permission is required to join a room. Please grant it in Settings.',
+      );
+    }
+  }
+
+  Future<void> _ensureGetstreamInitialized({
+    required String userId,
+    required String userName,
+    required UserRole role,
+  }) async {
+    if (ref.read(getstreamStateProvider).isInitialized) return;
+    final token =
+        await ref.read(secureStorageProvider).read(StorageKeys.getstreamToken) ??
+        '';
+    await ref.read(getstreamStateProvider.notifier).init(
+          userId: userId,
+          userName: userName,
+          getstreamToken: token,
+          role: role,
+        );
   }
 
   void _scheduleParticipantCheck(
@@ -553,6 +471,7 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
         call.leave().catchError((_) {});
         ref.read(activeCallProvider.notifier).setCall(null);
         state = AsyncData(current.copyWith(isEnded: true, isInCall: false));
+        ref.read(sessionHistoryProvider.notifier).recordLeave();
       }
 
       // Forward closed caption events to backend for admin live transcription view
@@ -601,6 +520,7 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
         call.leave().catchError((_) {});
         ref.read(activeCallProvider.notifier).setCall(null);
         state = AsyncData(current.copyWith(isEnded: true, isInCall: false));
+        ref.read(sessionHistoryProvider.notifier).recordLeave();
       }
     });
   }
@@ -695,6 +615,7 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
         await _repo().leaveRoom(roomId);
       } catch (_) {}
     }
+    await ref.read(sessionHistoryProvider.notifier).recordLeave();
     _cleanup();
   }
 
@@ -721,6 +642,7 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
         ;
       }
     }
+    await ref.read(sessionHistoryProvider.notifier).recordLeave();
     _cleanup();
   }
 
@@ -766,232 +688,3 @@ final roomSessionProvider =
     AsyncNotifierProvider<RoomSessionNotifier, RoomSession>(
       RoomSessionNotifier.new,
     );
-
-//backup
-  // Future<void> _enterCall({
-  //   required String getstreamCallId,
-  //   required String roomId,
-  // }) async {
-  //
-  //   // final current = state.value;
-  //   // print("-----------------------------------------------------------");
-  //   // print("current : ${current.toString()}");
-  //   // print("-----------------------------------------------------------");
-  //
-  //   // final current = state.value;
-  //   // if (current == null) return;
-  //
-  //   if (useJoinApi) {
-  //     final data = await _repo().joinRoom(_roomId!);
-  //     callId = data['getstreamCallId'] as String? ?? getstreamCallId;
-  //   }
-  //   final authState = ref.read(authStateProvider);
-  //   final userId = authState.whenOrNull(authenticated: (user) => user.userId);
-  //   final userRole = authState.whenOrNull(authenticated: (user) => user.role);
-  //   print("────────────────────────────────────────────────────────────────");
-  //   print("userId : ${userId}, userRole: ${userRole.toString()}");
-  //   print("────────────────────────────────────────────────────────────────");
-  //
-  //   // Request microphone permission before touching the audio stack.
-  //   final micStatus = await Permission.microphone.request();
-  //   if (!micStatus.isGranted) {
-  //     throw Exception(
-  //       'Microphone permission is required to join a room. Please grant it in Settings.',
-  //     );
-  //   }
-  //
-  //   if (userRole == UserRole.host) {
-  //     // final token = await ref
-  //     //     .read(secureStorageProvider)
-  //     //     .read(StorageKeys.getstreamToken);
-  //
-  //     final call = StreamVideo.instance.makeCall(
-  //       callType: StreamCallType.audioRoom(),
-  //       id: getstreamCallId,
-  //     );
-  //
-  //     await call.getOrCreate(
-  //       audio: StreamAudioSettings(
-  //         accessRequestEnabled: true,
-  //         micDefaultOn: true,
-  //       ),
-  //     );
-  //
-  //     // final client = StreamVideo(
-  //     //   AppConstants.getstreamApiKey,
-  //     //   user: User.regular(
-  //     //     userId: userId!,
-  //     //     name: 'custom room test user 1',
-  //     //     role: 'host',
-  //     //   ),
-  //     //   userToken: token,
-  //     //   failIfSingletonExists: false,
-  //     // );
-  //
-  //     // dart format off
-  //       // print("──────────────────────────────────────────────────────────────────────────");
-  //       // print("StreamVideo client initialized: ${client.currentUser.toJson()}");
-  //       // print("──────────────────────────────────────────────────────────────────────────");
-  //       // dart format on
-  //
-  //     // final result = await client.connect();
-  //     // // if result wasn't successful, then result will return null
-  //     // if (result.isSuccess) {
-  //     //   print("────────────────────────────────────────────────────────────");
-  //     //   print("StreamVideo client connected successfully");
-  //     //   print("────────────────────────────────────────────────────────────");
-  //     //
-  //     //   final userToken = result.getDataOrNull();
-  //     //   // userInfo.id will be slightly different from what you passed in. This is because the SDK will generate a unique ID for the user. Please use the generated ID across your app.
-  //     //   final userInfo = client.currentUser;
-  //     //   print("────────────────────────────────────────────────────────────");
-  //     //   print("userInfo : ${userInfo.toJson()}");
-  //     //   print("────────────────────────────────────────────────────────────");
-  //     // } else {
-  //     //   print("────────────────────────────────────────────────────────────");
-  //     //   print("StreamVideo client failed to connect: ${result.toString()}");
-  //     //   print("────────────────────────────────────────────────────────────");
-  //     // }
-  //
-  //     // print("────────────────────────────────────────────────────────────");
-  //     // print("Attempting to create/get call with ID: 'Your-call-ID'");
-  //     // print("────────────────────────────────────────────────────────────");
-  //     // final call = client.makeCall(
-  //     //   callType: StreamCallType.audioRoom(),
-  //     //   id: 'Your-call-ID-XYZ',
-  //     // );
-  //     // final newOrOldCall = await call.getOrCreate();
-  //     // print("────────────────────────────────────────────────────────────");
-  //     // print(
-  //     //   "Call created or retrieved successfully: ${newOrOldCall.toString()}",
-  //     // );
-  //     // print("────────────────────────────────────────────────────────────");
-  //
-  //     await call.join();
-  //     await call.goLive();
-  //
-  //     ref.read(activeCallProvider.notifier).setCall(call);
-  //     // state = AsyncData(
-  //     //   RoomSession(
-  //     //     roomId: roomId,
-  //     //     roomName: roomData.room.name,
-  //     //     status: RoomStatus.live,
-  //     //     members: [],
-  //     //     getstreamCallId: roomData.room.getstreamCallId,
-  //     //     isInCall: true,
-  //     //     isHost: true,
-  //     //   ),
-  //     // );
-  //
-  //     // final hehe = call.callEvents.listen(
-  //     //   (stev) => print("stream event: ${stev.toString()}"),
-  //     // );
-  //   } else {
-  //     // final client = StreamVideo(
-  //     //   AppConstants.getstreamApiKey,
-  //     //   user: User.regular(userId: userId!, name: 'custom room test user 1'),
-  //     //   userToken: roomData.getstreamToken,
-  //     //   failIfSingletonExists: false,
-  //     // );
-  //     //
-  //     // final result = await client.connect();
-  //     // // if result wasn't successful, then result will return null
-  //     // if (result.isSuccess) {
-  //     //   print("────────────────────────────────────────────────────────────");
-  //     //   print("guest StreamVideo client connected successfully");
-  //     //   print("────────────────────────────────────────────────────────────");
-  //     //
-  //     //   final userToken = result.getDataOrNull();
-  //     //   // userInfo.id will be slightly different from what you passed in. This is because the SDK will generate a unique ID for the user. Please use the generated ID across your app.
-  //     //   final userInfo = client.currentUser;
-  //     //   print("────────────────────────────────────────────────────────────");
-  //     //   print("guest userInfo : ${userInfo.toJson()}");
-  //     //   print("────────────────────────────────────────────────────────────");
-  //     // } else {
-  //     //   print("────────────────────────────────────────────────────────────");
-  //     //   print(
-  //     //     "guest StreamVideo client failed to connect: ${result.toString()}",
-  //     //   );
-  //     //   print("────────────────────────────────────────────────────────────");
-  //     // }
-  //     //
-  //     // print("────────────────────────────────────────────────────────────");
-  //     // print(
-  //     //   "Guest user cannot create calls. Attempting to join call with ID: 'Your-call-ID'",
-  //     // );
-  //     // print("────────────────────────────────────────────────────────────");
-  //     // final call = client.makeCall(
-  //     //   callType: StreamCallType.audioRoom(),
-  //     //   id: 'Your-call-ID-XYZ',
-  //     // );
-  //     // await call.addMembers([
-  //     //   const UserInfo(id: 'charlie', role: 'call_member'),
-  //     // ]);
-  //
-  //     final call = StreamVideo.instance.makeCall(
-  //       callType: StreamCallType.audioRoom(),
-  //       id: getstreamCallId,
-  //     );
-  //
-  //     await call.getOrCreate(
-  //       audio: StreamAudioSettings(
-  //         accessRequestEnabled: true,
-  //         micDefaultOn: true,
-  //       ),
-  //     );
-  //
-  //     // await call.grantPermissions(
-  //     //   userId: userId,
-  //     //   permissions: [CallPermission.sendAudio, CallPermission.joinCall],
-  //     // );
-  //     // await call.setMicrophoneEnabled(enabled: true);
-  //     await call.join();
-  //     ref.read(activeCallProvider.notifier).setCall(call);
-  //     // state = AsyncData(
-  //     //   RoomSession(
-  //     //     roomId: roomId,
-  //     //     roomName: roomData.room.name,
-  //     //     members: [],
-  //     //     status: RoomStatus.live,
-  //     //     getstreamCallId: roomData.room.getstreamCallId,
-  //     //     isInCall: true,
-  //     //     isHost: false,
-  //     //   ),
-  //     // );
-  //
-  //     // final hehe = call.callEvents.listen(
-  //     //   (stev) => print("stream event: ${stev.toString()}"),
-  //     // );
-  //   }
-  //
-  //   final call = StreamVideo.instance.makeCall(
-  //     callType: StreamCallType.audioRoom(),
-  //     id: callId,
-  //   );
-  //   await call.getOrCreate();
-  //
-  //   // Join with mic disabled — PTT controls it explicitly.
-  //   final connectOptions = CallConnectOptions(
-  //     microphone: TrackOption.disabled(),
-  //   );
-  //   await call.join(connectOptions: connectOptions);
-  //   await call.setMicrophoneEnabled(enabled: false);
-  //
-  //   // Host must call goLive() to take the call out of backstage so
-  //   // participants can join. This is required for the audio_room call type.
-  //   if (current.isHost) {
-  //     await call.goLive();
-  //   }
-  //
-  //   ref.read(activeCallProvider.notifier).setCall(call);
-  //
-  //   _subscribeToCallState(call);
-  //   _subscribeToWsEvents(_roomId!);
-  //
-  //   state = AsyncData(
-  //     (state.value ?? current).copyWith(
-  //       getstreamCallId: callId,
-  //       isInCall: true,
-  //     ),
-  //   );
-  // }

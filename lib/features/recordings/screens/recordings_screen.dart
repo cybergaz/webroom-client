@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../shell/widgets/floating_pill_navbar.dart';
 import '../../../data/models/my_recording_model.dart';
 import '../../../data/models/room_model.dart';
 import '../../../domain/enums/room_status.dart';
@@ -118,6 +119,7 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         title: const Text('My Recordings'),
+        automaticallyImplyLeading: false,
       ),
       body: roomsAsync.when(
         loading: () => const Center(
@@ -169,7 +171,12 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
             );
           }
           return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+            padding: EdgeInsets.fromLTRB(
+              12,
+              12,
+              12,
+              FloatingPillNavBar.bottomPadding(context) + 8,
+            ),
             itemCount: rooms.length,
             separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (_, i) => _RoomTile(
@@ -508,7 +515,9 @@ class _RecordingsList extends StatelessWidget {
 
     return ListView.builder(
       controller: scrollController,
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: EdgeInsets.only(
+        bottom: FloatingPillNavBar.bottomPadding(context) + 8,
+      ),
       itemCount: itemCount,
       itemBuilder: (context, i) {
         if (i == items.length) {
