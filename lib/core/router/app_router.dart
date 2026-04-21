@@ -5,6 +5,8 @@ import 'package:webroom_client/features/home/screens/home_screen.dart';
 import '../../features/recordings/screens/recordings_screen.dart';
 import '../../features/session_history/screens/session_history_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
+import '../../features/legal/screens/privacy_policy_screen.dart';
+import '../../features/legal/screens/terms_of_service_screen.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/signup_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
@@ -96,6 +98,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const SettingsScreen(),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/legal/privacy',
+        name: 'privacy-policy',
+        builder: (context, state) => const PrivacyPolicyScreen(),
+      ),
+      GoRoute(
+        path: '/legal/terms',
+        name: 'terms-of-service',
+        builder: (context, state) => const TermsOfServiceScreen(),
       ),
       GoRoute(
         path: '/room/:roomId',
