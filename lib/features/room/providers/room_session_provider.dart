@@ -16,6 +16,7 @@ import '../../../core/network/websocket_service.dart';
 import '../../../domain/enums/room_status.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../session_history/providers/session_history_provider.dart';
+import '../platform/remote_audio_mute.dart';
 import 'getstream_provider.dart';
 
 part 'room_session_provider.freezed.dart';
@@ -428,16 +429,21 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
         _grantedPermissionUsers.removeWhere((id) => !currentUserIds.contains(id));
       } else {
         // Non-host users should only hear the host, not other participants.
-        // Disable audio tracks of non-host remote participants locally.
+        // On mobile, `track.disable()` silences remote audio. On web, the
+        // browser's <audio> element keeps playing even with a disabled track,
+        // so we also mute the element directly via a web-only helper.
         for (final p in callState.callParticipants) {
           if (p.isLocal) continue;
           final track = call.getTrack(p.trackIdPrefix, SfuTrackType.audio);
-          if (track == null) continue;
-          if (p.roles.contains('host')) {
-            track.enable();
-          } else {
-            track.disable();
+          final isHost = p.roles.contains('host');
+          if (track != null) {
+            if (isHost) {
+              track.enable();
+            } else {
+              track.disable();
+            }
           }
+          setRemoteAudioMuted(p.trackIdPrefix, !isHost);
         }
       }
 
