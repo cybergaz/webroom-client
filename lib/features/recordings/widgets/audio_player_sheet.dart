@@ -5,6 +5,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/my_recording_model.dart';
+import '../../shell/widgets/floating_pill_navbar.dart';
 
 class AudioPlayerSheet extends StatefulWidget {
   final MyRecording recording;
@@ -95,7 +96,11 @@ class _AudioPlayerSheetState extends State<AudioPlayerSheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.fromLTRB(
-          24, 16, 24, 24 + MediaQuery.of(context).padding.bottom),
+        24,
+        16,
+        24,
+        FloatingPillNavBar.bottomPadding(context) + 16,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

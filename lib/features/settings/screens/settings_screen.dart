@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/clipboard_util.dart';
 import '../../../data/models/user_model.dart';
 import '../../../domain/enums/user_role.dart';
 import '../../../shared/widgets/app_snackbar.dart';
@@ -38,6 +39,11 @@ class SettingsScreen extends ConsumerWidget {
             const _Header(),
             const SizedBox(height: 24),
             _ProfileCard(user: user),
+            if (user.role == UserRole.user &&
+                (user.requestId ?? '').isNotEmpty) ...[
+              const SizedBox(height: 20),
+              _RequestIdCard(requestId: user.requestId!),
+            ],
             const SizedBox(height: 20),
             const _LegalCard(),
             const SizedBox(height: 20),
@@ -358,6 +364,74 @@ class _RoleBadge extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Request ID card ─────────────────────────────────────────────────────────
+
+class _RequestIdCard extends StatelessWidget {
+  final String requestId;
+
+  const _RequestIdCard({required this.requestId});
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsCard(
+      icon: Icons.fingerprint_rounded,
+      title: 'Your Request ID',
+      children: [
+        const Text(
+          'Share this ID with your admin to get approved or to resolve any '
+          'account-related issue.',
+          style: TextStyle(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceVariant,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.divider),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  requestId,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 14,
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy_rounded, size: 20),
+                color: AppColors.accent,
+                tooltip: 'Copy',
+                onPressed: () async {
+                  await ClipboardUtil.copy(requestId);
+                  if (context.mounted) {
+                    AppSnackBar.show(
+                      context,
+                      message: 'Request ID copied to clipboard',
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
