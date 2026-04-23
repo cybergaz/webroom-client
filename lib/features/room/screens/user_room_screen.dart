@@ -529,7 +529,9 @@ class _MicToggleAreaState extends State<_MicToggleArea>
     _busy = true;
     HapticFeedback.mediumImpact();
     try {
-      await widget.call.setMicrophoneEnabled(enabled: !currentlyUnmuted);
+      await widget.call
+          .setMicrophoneEnabled(enabled: !currentlyUnmuted)
+          .timeout(const Duration(seconds: 5));
     } catch (_) {}
     _busy = false;
   }

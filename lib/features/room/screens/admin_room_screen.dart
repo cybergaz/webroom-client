@@ -73,19 +73,31 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
     return false;
   }
 
+  bool _muteBusy = false;
+
   Future<void> _triggerMuteToggle() async {
+    if (_muteBusy) return;
+    _muteBusy = true;
     final call = ref.read(activeCallProvider);
-    if (call == null) return;
+    if (call == null) {
+      _muteBusy = false;
+      return;
+    }
     final isMuted =
         !(call.state.valueOrNull?.localParticipant?.isAudioEnabled ?? false);
     final willUnmute = isMuted;
     HapticFeedback.mediumImpact();
-    await call.setMicrophoneEnabled(enabled: willUnmute);
+    try {
+      await call
+          .setMicrophoneEnabled(enabled: willUnmute)
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {}
     if (willUnmute) {
       ref.read(hostRecordingProvider.notifier).onUnmute();
     } else {
       ref.read(hostRecordingProvider.notifier).onMute();
     }
+    _muteBusy = false;
   }
 
   @override

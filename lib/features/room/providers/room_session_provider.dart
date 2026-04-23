@@ -245,6 +245,18 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
     final userRole = authState.whenOrNull(authenticated: (user) => user.role)!;
     final isHost = userRole == UserRole.host;
 
+    // Defensive: tear down any stale Call instance left over from a
+    // previous session. Without this, after several join/leave cycles
+    // the coordinator/SFU state can become inconsistent and the room
+    // turns into a ghost (mute frozen, host never appears).
+    final staleCall = ref.read(activeCallProvider);
+    if (staleCall != null) {
+      try {
+        await staleCall.leave();
+      } catch (_) {}
+      ref.read(activeCallProvider.notifier).setCall(null);
+    }
+
     // Parallel: mic permission + SDK singleton init.
     await Future.wait([
       _ensureMicPermission(),
@@ -260,9 +272,13 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
       id: getstreamCallId,
     );
 
-    final getCallRes = await call.getOrCreate(
-      audio: StreamAudioSettings(micDefaultOn: false),
-    );
+    final getCallRes = await call
+        .getOrCreate(audio: StreamAudioSettings(micDefaultOn: false))
+        .timeout(
+          const Duration(seconds: 20),
+          onTimeout: () =>
+              throw Exception('getOrCreate timed out (SFU unresponsive)'),
+        );
     if (!getCallRes.isSuccess) {
       throw Exception('getOrCreate failed: $getCallRes');
     }
@@ -294,11 +310,15 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
       // means the first real unmute only has to flip a flag + re-acquire
       // the mic (fast) instead of negotiating a fresh track with the SFU
       // (slow — previously caused first-word drops). Done fire-and-forget
-      // so it never blocks the join.
+      // with timeouts so a stuck SFU never blocks or leaves the mic open.
       () async {
         try {
-          await call.setMicrophoneEnabled(enabled: true);
-          await call.setMicrophoneEnabled(enabled: false);
+          await call
+              .setMicrophoneEnabled(enabled: true)
+              .timeout(const Duration(seconds: 5));
+          await call
+              .setMicrophoneEnabled(enabled: false)
+              .timeout(const Duration(seconds: 5));
         } catch (e) {
           print('mic pre-warm failed (non-fatal): $e');
         }
@@ -614,8 +634,14 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
     final call = ref.read(activeCallProvider);
     if (call != null) {
       // Disable mic before leaving to ensure audio track is properly released.
-      await call.setMicrophoneEnabled(enabled: false).catchError((_) {});
-      await call.leave();
+      try {
+        await call
+            .setMicrophoneEnabled(enabled: false)
+            .timeout(const Duration(seconds: 3));
+      } catch (_) {}
+      try {
+        await call.leave().timeout(const Duration(seconds: 5));
+      } catch (_) {}
       ref.read(activeCallProvider.notifier).setCall(null);
     }
     final roomId = _roomId;
@@ -626,14 +652,19 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
     }
     await ref.read(sessionHistoryProvider.notifier).recordLeave();
     _cleanup();
+    _resetState();
   }
 
   Future<void> endRoom() async {
     _isLeaving = true;
     final call = ref.read(activeCallProvider);
     if (call != null) {
-      await call.stopLive();
-      await call.leave();
+      try {
+        await call.stopLive().timeout(const Duration(seconds: 5));
+      } catch (_) {}
+      try {
+        await call.leave().timeout(const Duration(seconds: 5));
+      } catch (_) {}
       ref.read(activeCallProvider.notifier).setCall(null);
     }
     final roomId = _roomId;
@@ -642,17 +673,12 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
         await _repo().endRoom(roomId);
       } on DioException catch (e) {
         // 409 means room is already not live — treat as successful end
-        print("-----------------------------------------------------------");
         print("statusCode : ${e.response?.statusCode}");
-        print("-----------------------------------------------------------");
-        if (e.response?.statusCode == 409) {
-          _cleanup();
-        }
-        ;
       }
     }
     await ref.read(sessionHistoryProvider.notifier).recordLeave();
     _cleanup();
+    _resetState();
   }
 
   Future<void> muteMember(String userId, bool muted) async {
@@ -675,6 +701,18 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
 
   RoomRepositoryImpl _repo() =>
       RoomRepositoryImpl(RoomRemoteDatasource(ref.read(dioClientProvider)));
+
+  void _resetState() {
+    state = const AsyncData(
+      RoomSession(
+        roomId: '',
+        roomName: '',
+        status: RoomStatus.inactive,
+        members: [],
+        getstreamCallId: '',
+      ),
+    );
+  }
 
   void _cleanup() {
     _wsSub?.cancel();
