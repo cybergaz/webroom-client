@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "stream": {
+      "source": "GetStream/agent-skills",
+      "sourceType": "github",
+      "computedHash": "593ee0339b917e2e63e02c3c6c9b031d12699a695f7aa88c49e0e3a645af0dcd"
+    }
+  }
+}

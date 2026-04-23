@@ -36,17 +36,16 @@ class PrivacyPolicyScreen extends StatelessWidget {
       '• To create and maintain your account.\n'
           '• To route audio between members of a live room.\n'
           '• To let admins moderate their rooms and verify device use.\n'
-          '• To generate session transcripts and recordings when a host '
-          'enables them.\n'
+          '• To generate session recordings when a host enables them.\n'
           '• To keep the service secure and diagnose problems.',
     ),
     (
-      'Recordings and transcripts',
-      'Hosts can record rooms and generate transcripts. When a room is '
-          'recorded you will see an indicator in the room screen. Recordings '
-          'are stored in secure object storage and are accessible to the host '
-          'and the admins who manage them. You can ask your admin to delete '
-          'any session you were part of.',
+      'Recordings',
+      'Hosts can record rooms. When a room is recorded you will see an '
+          'indicator in the room screen. Recordings are stored in secure '
+          'object storage and are accessible to the host and the admins who '
+          'manage them. You can ask your admin to delete any session you '
+          'were part of.',
     ),
     (
       'Sharing',
@@ -64,9 +63,9 @@ class PrivacyPolicyScreen extends StatelessWidget {
     ),
     (
       'Retention',
-      'We keep your profile data while your account is active. Recordings and '
-          'transcripts are kept for as long as your admin chooses to keep them '
-          'within the licence period. Backups are rotated on a rolling window.',
+      'We keep your profile data while your account is active. Recordings '
+          'are kept for as long as your admin chooses to keep them within '
+          'the licence period. Backups are rotated on a rolling window.',
     ),
     (
       'Contact',

@@ -280,15 +280,29 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
         .join(connectOptions: connectOptions)
         .timeout(const Duration(seconds: 15));
 
-    // Host: tell the server to goLive + start recording/transcription + notify
-    // members. Must run after the host is actually in the SFU so members
-    // aren't woken up to join an empty live call.
+    // Host: tell the server to goLive + notify members. Must run after the
+    // host is actually in the SFU so members aren't woken up to join an
+    // empty live call.
     if (isHost) {
       try {
         await _repo().hostReady(roomId);
       } catch (e) {
         print('hostReady failed (non-fatal): $e');
       }
+    } else {
+      // Non-host: pre-warm the mic track. Publishing on join then muting
+      // means the first real unmute only has to flip a flag + re-acquire
+      // the mic (fast) instead of negotiating a fresh track with the SFU
+      // (slow — previously caused first-word drops). Done fire-and-forget
+      // so it never blocks the join.
+      () async {
+        try {
+          await call.setMicrophoneEnabled(enabled: true);
+          await call.setMicrophoneEnabled(enabled: false);
+        } catch (e) {
+          print('mic pre-warm failed (non-fatal): $e');
+        }
+      }();
     }
 
     ref.read(activeCallProvider.notifier).setCall(call);
@@ -478,17 +492,6 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
         ref.read(activeCallProvider.notifier).setCall(null);
         state = AsyncData(current.copyWith(isEnded: true, isInCall: false));
         ref.read(sessionHistoryProvider.notifier).recordLeave();
-      }
-
-      // Forward closed caption events to backend for admin live transcription view
-      if (event is StreamCallClosedCaptionsEvent) {
-        final wsService = ref.read(websocketServiceProvider);
-        wsService.send('transcription.caption', {
-          'roomId': _roomId,
-          'text': event.text,
-          'startTime': event.startTime.toIso8601String(),
-          'endTime': event.endTime.toIso8601String(),
-        });
       }
     });
 

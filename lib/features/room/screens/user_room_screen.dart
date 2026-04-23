@@ -9,7 +9,6 @@ import 'package:stream_video/stream_video.dart';
 import '../providers/getstream_provider.dart';
 import '../providers/odds_provider.dart';
 import '../providers/room_session_provider.dart';
-import '../providers/ptt_provider.dart';
 import '../widgets/banner_slider.dart';
 import '../widgets/market_odds_box.dart';
 import '../widgets/marquee_text.dart';
@@ -248,31 +247,25 @@ class _UserCallView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ptt = ref.watch(pttStateProvider);
-
     return Column(
       children: [
         if (showLargeHost)
           Expanded(flex: 5, child: _HostCard(call: call)),
         Expanded(
           flex: showLargeHost ? 5 : 10,
-          child: _PttArea(
-            isTransmitting: ptt.isTransmitting,
-            audioLevel: ptt.audioLevel,
-            onPttDown: () => ref.read(pttStateProvider.notifier).startTransmitting(),
-            onPttUp: () => ref.read(pttStateProvider.notifier).stopTransmitting(),
-          ),
+          child: _MicToggleArea(call: call),
         ),
         if (marqueeText != null && marqueeText!.trim().isNotEmpty)
           _RoomMarquee(text: marqueeText!),
         _BottomControls(
           call: call,
           onLeave: () async {
-            // Capture notifiers before navigation disposes the widget's ref
-            final ptt = ref.read(pttStateProvider.notifier);
+            // Capture notifier before navigation disposes the widget's ref
             final session = ref.read(roomSessionProvider.notifier);
             if (context.mounted) context.go('/home');
-            await ptt.stopTransmitting();
+            try {
+              await call.setMicrophoneEnabled(enabled: false);
+            } catch (_) {}
             await session.leaveRoom();
           },
         ),
@@ -474,31 +467,25 @@ class _StatusBadge extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// PTT area
+// Mic toggle area — single-tap mute/unmute
 // ---------------------------------------------------------------------------
 
-class _PttArea extends StatefulWidget {
-  final bool isTransmitting;
-  final double audioLevel;
-  final VoidCallback onPttDown;
-  final VoidCallback onPttUp;
+class _MicToggleArea extends StatefulWidget {
+  final Call call;
 
-  const _PttArea({
-    required this.isTransmitting,
-    required this.audioLevel,
-    required this.onPttDown,
-    required this.onPttUp,
-  });
+  const _MicToggleArea({required this.call});
 
   @override
-  State<_PttArea> createState() => _PttAreaState();
+  State<_MicToggleArea> createState() => _MicToggleAreaState();
 }
 
-class _PttAreaState extends State<_PttArea> with TickerProviderStateMixin {
+class _MicToggleAreaState extends State<_MicToggleArea>
+    with TickerProviderStateMixin {
   late final AnimationController _pressCtrl;
   late final AnimationController _pulseCtrl;
   late final Animation<double> _scaleAnim;
   late final Animation<double> _pulseAnim;
+  bool _busy = false;
 
   @override
   void initState() {
@@ -520,136 +507,158 @@ class _PttAreaState extends State<_PttArea> with TickerProviderStateMixin {
   }
 
   @override
-  void didUpdateWidget(covariant _PttArea old) {
-    super.didUpdateWidget(old);
-    if (widget.isTransmitting && !old.isTransmitting) {
-      _pressCtrl.forward();
-      _pulseCtrl.repeat();
-    } else if (!widget.isTransmitting && old.isTransmitting) {
-      _pressCtrl.reverse();
-      _pulseCtrl.stop();
-      _pulseCtrl.reset();
-    }
-  }
-
-  @override
   void dispose() {
     _pressCtrl.dispose();
     _pulseCtrl.dispose();
     super.dispose();
   }
 
+  void _syncAnimations(bool isUnmuted) {
+    if (isUnmuted) {
+      if (!_pulseCtrl.isAnimating) _pulseCtrl.repeat();
+      _pressCtrl.forward();
+    } else {
+      _pulseCtrl.stop();
+      _pulseCtrl.reset();
+      _pressCtrl.reverse();
+    }
+  }
+
+  Future<void> _toggle(bool currentlyUnmuted) async {
+    if (_busy) return;
+    _busy = true;
+    HapticFeedback.mediumImpact();
+    try {
+      await widget.call.setMicrophoneEnabled(enabled: !currentlyUnmuted);
+    } catch (_) {}
+    _busy = false;
+  }
+
   @override
   Widget build(BuildContext context) {
-    const double btnSize = 130;
-    final double levelRing = widget.audioLevel.clamp(0.0, 1.0) * 22;
+    return StreamBuilder<CallState>(
+      stream: widget.call.state.valueStream,
+      initialData: widget.call.state.valueOrNull,
+      builder: (context, snapshot) {
+        final local = snapshot.data?.localParticipant;
+        final isUnmuted = local?.isAudioEnabled ?? false;
+        final audioLevel = (local?.audioLevel ?? 0).toDouble();
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        AnimatedBuilder(
-          animation: Listenable.merge([_scaleAnim, _pulseAnim]),
-          builder: (context, child) {
-            return SizedBox(
-              width: btnSize + 64,
-              height: btnSize + 64,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Expanding pulse ring
-                  if (widget.isTransmitting)
-                    AnimatedBuilder(
-                      animation: _pulseAnim,
-                      builder: (_, __) {
-                        final v = _pulseAnim.value;
-                        final size = btnSize + v * 50;
-                        return SizedBox(
-                          width: size,
-                          height: size,
+        // Schedule after-build so we don't trigger a rebuild during build.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _syncAnimations(isUnmuted);
+        });
+
+        const double btnSize = 130;
+        final double levelRing = audioLevel.clamp(0.0, 1.0) * 22;
+
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: Listenable.merge([_scaleAnim, _pulseAnim]),
+              builder: (context, child) {
+                return SizedBox(
+                  width: btnSize + 64,
+                  height: btnSize + 64,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      if (isUnmuted)
+                        AnimatedBuilder(
+                          animation: _pulseAnim,
+                          builder: (_, __) {
+                            final v = _pulseAnim.value;
+                            final size = btnSize + v * 50;
+                            return SizedBox(
+                              width: size,
+                              height: size,
+                              child: CustomPaint(
+                                painter: _RingPainter(
+                                  color: AppColors.accent
+                                      .withValues(alpha: (1 - v) * 0.28),
+                                  strokeWidth: 2.5,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      if (isUnmuted)
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 80),
+                          width: btnSize + levelRing,
+                          height: btnSize + levelRing,
                           child: CustomPaint(
                             painter: _RingPainter(
-                              color: AppColors.accent.withValues(alpha: (1 - v) * 0.28),
-                              strokeWidth: 2.5,
+                              color: AppColors.accent.withValues(alpha: 0.48),
+                              strokeWidth: 3.5 + levelRing * 0.12,
                             ),
                           ),
-                        );
-                      },
-                    ),
-                  // Audio-level reactive ring
-                  if (widget.isTransmitting)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 80),
-                      width: btnSize + levelRing,
-                      height: btnSize + levelRing,
-                      child: CustomPaint(
-                        painter: _RingPainter(
-                          color: AppColors.accent.withValues(alpha: 0.48),
-                          strokeWidth: 3.5 + levelRing * 0.12,
                         ),
-                      ),
-                    ),
-                  // Main button
-                  Transform.scale(scale: _scaleAnim.value, child: child),
-                ],
-              ),
-            );
-          },
-          child: Listener(
-            onPointerDown: (_) {
-              HapticFeedback.mediumImpact();
-              widget.onPttDown();
-            },
-            onPointerUp: (_) {
-              HapticFeedback.lightImpact();
-              widget.onPttUp();
-            },
-            onPointerCancel: (_) => widget.onPttUp(),
-            child: SizedBox(
-              width: btnSize,
-              height: btnSize,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: widget.isTransmitting ? AppColors.accent : AppColors.surfaceVariant,
-                  border: Border.all(
-                    color: widget.isTransmitting ? AppColors.accentLight : AppColors.divider,
-                    width: widget.isTransmitting ? 2.5 : 1.5,
+                      Transform.scale(scale: _scaleAnim.value, child: child),
+                    ],
                   ),
-                  boxShadow: widget.isTransmitting
-                      ? [
-                          BoxShadow(
-                            color: AppColors.accent.withValues(alpha: 0.5),
-                            blurRadius: 28,
-                            spreadRadius: 6,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Icon(
-                  widget.isTransmitting ? Icons.mic_rounded : Icons.mic_none_rounded,
-                  color: widget.isTransmitting ? Colors.white : AppColors.textSecondary,
-                  size: 48,
+                );
+              },
+              child: GestureDetector(
+                onTap: () => _toggle(isUnmuted),
+                child: SizedBox(
+                  width: btnSize,
+                  height: btnSize,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isUnmuted
+                          ? AppColors.accent
+                          : AppColors.surfaceVariant,
+                      border: Border.all(
+                        color: isUnmuted
+                            ? AppColors.accentLight
+                            : AppColors.divider,
+                        width: isUnmuted ? 2.5 : 1.5,
+                      ),
+                      boxShadow: isUnmuted
+                          ? [
+                              BoxShadow(
+                                color: AppColors.accent.withValues(alpha: 0.5),
+                                blurRadius: 28,
+                                spreadRadius: 6,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Icon(
+                      isUnmuted
+                          ? Icons.mic_rounded
+                          : Icons.mic_none_rounded,
+                      color: isUnmuted
+                          ? Colors.white
+                          : AppColors.textSecondary,
+                      size: 48,
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          child: Text(
-            widget.isTransmitting ? 'Talking...' : 'Hold to Talk',
-            key: ValueKey(widget.isTransmitting),
-            style: TextStyle(
-              color: widget.isTransmitting ? AppColors.accent : AppColors.textHint,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.6,
+            const SizedBox(height: 14),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Text(
+                isUnmuted ? 'Talking...' : 'Tap to Talk',
+                key: ValueKey(isUnmuted),
+                style: TextStyle(
+                  color: isUnmuted ? AppColors.accent : AppColors.textHint,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.6,
+                ),
+              ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }

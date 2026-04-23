@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:stream_video/stream_video.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/router/app_router.dart';
 import '../providers/getstream_provider.dart';
-import '../providers/ptt_provider.dart';
 import '../providers/room_session_provider.dart';
 
 /// A draggable floating mini-player shown when the user navigates away
@@ -24,7 +24,6 @@ class _ActiveCallOverlayState extends ConsumerState<ActiveCallOverlay> {
   Widget build(BuildContext context) {
     final call = ref.watch(activeCallProvider);
     final session = ref.watch(roomSessionProvider).value;
-    final ptt = ref.watch(pttStateProvider);
     final isOnRoomScreen = ref.watch(isOnRoomScreenProvider);
 
     // Only show when there's an active call and we're NOT on the room screen.
@@ -86,7 +85,9 @@ class _ActiveCallOverlayState extends ConsumerState<ActiveCallOverlay> {
                     const SizedBox(width: 4),
                     GestureDetector(
                       onTap: () async {
-                        await ref.read(pttStateProvider.notifier).stopTransmitting();
+                        try {
+                          await call.setMicrophoneEnabled(enabled: false);
+                        } catch (_) {}
                         if (session.isHost) {
                           await ref.read(roomSessionProvider.notifier).endRoom();
                         } else {
@@ -110,52 +111,60 @@ class _ActiveCallOverlayState extends ConsumerState<ActiveCallOverlay> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                // Mini PTT button
-                GestureDetector(
-                  onTapDown: (_) {
-                    HapticFeedback.mediumImpact();
-                    ref.read(pttStateProvider.notifier).startTransmitting();
-                  },
-                  onTapUp: (_) {
-                    HapticFeedback.lightImpact();
-                    ref.read(pttStateProvider.notifier).stopTransmitting();
-                  },
-                  onTapCancel: () {
-                    ref.read(pttStateProvider.notifier).stopTransmitting();
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: ptt.isTransmitting
-                          ? AppColors.accent
-                          : AppColors.surfaceVariant,
-                      border: Border.all(
-                        color: ptt.isTransmitting
-                            ? AppColors.accent
-                            : AppColors.error.withValues(alpha: 0.5),
-                        width: ptt.isTransmitting ? 2.5 : 1.5,
+                // Mini mute toggle
+                StreamBuilder<CallState>(
+                  stream: call.state.valueStream,
+                  initialData: call.state.valueOrNull,
+                  builder: (context, snap) {
+                    final isUnmuted =
+                        snap.data?.localParticipant?.isAudioEnabled ?? false;
+                    return GestureDetector(
+                      onTap: () async {
+                        HapticFeedback.mediumImpact();
+                        try {
+                          await call.setMicrophoneEnabled(
+                            enabled: !isUnmuted,
+                          );
+                        } catch (_) {}
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isUnmuted
+                              ? AppColors.accent
+                              : AppColors.surfaceVariant,
+                          border: Border.all(
+                            color: isUnmuted
+                                ? AppColors.accent
+                                : AppColors.error.withValues(alpha: 0.5),
+                            width: isUnmuted ? 2.5 : 1.5,
+                          ),
+                          boxShadow: isUnmuted
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.accent
+                                        .withValues(alpha: 0.4),
+                                    blurRadius: 16,
+                                    spreadRadius: 1,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Icon(
+                          isUnmuted
+                              ? Icons.mic_rounded
+                              : Icons.mic_off_rounded,
+                          color: isUnmuted
+                              ? Colors.white
+                              : AppColors.error,
+                          size: 22,
+                        ),
                       ),
-                      boxShadow: ptt.isTransmitting
-                          ? [
-                              BoxShadow(
-                                color: AppColors.accent.withValues(alpha: 0.4),
-                                blurRadius: 16,
-                                spreadRadius: 1,
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Icon(
-                      ptt.isTransmitting
-                          ? Icons.mic_rounded
-                          : Icons.mic_off_rounded,
-                      color: ptt.isTransmitting ? Colors.white : AppColors.error,
-                      size: 22,
-                    ),
-                  ),
+                    );
+                  },
                 ),
               ],
             ),
