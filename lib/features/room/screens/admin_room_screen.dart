@@ -190,11 +190,14 @@ class _AdminRoomScreenState extends ConsumerState<AdminRoomScreen> {
       stream: call.state.valueStream,
       initialData: call.state.valueOrNull,
       builder: (context, snapshot) {
-        final isMuted = !(snapshot.data?.localParticipant?.isAudioEnabled ?? false);
+        final local = snapshot.data?.localParticipant;
+        final isMuted = !(local?.isAudioEnabled ?? false);
+        final audioLevel = (local?.audioLevel ?? 0).toDouble();
         return CallControlsBar(
           call: call,
           isHost: true,
           isMuted: isMuted,
+          audioLevel: audioLevel,
           onMuteToggle: _triggerMuteToggle,
           onEndOrLeave: () async {
             // Stop host recording before ending

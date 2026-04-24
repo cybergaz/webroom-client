@@ -97,6 +97,7 @@ class _CallControlsBarState extends State<CallControlsBar> {
                   child: widget.isHost
                       ? _MuteToggleButton(
                           isMuted: widget.isMuted,
+                          audioLevel: widget.audioLevel,
                           onTap: widget.onMuteToggle,
                         )
                       : _PttButton(
@@ -385,41 +386,158 @@ class _PttButtonState extends State<_PttButton> with TickerProviderStateMixin {
 // Host mute/unmute toggle button
 // ---------------------------------------------------------------------------
 
-class _MuteToggleButton extends StatelessWidget {
+class _MuteToggleButton extends StatefulWidget {
   final bool isMuted;
+  final double audioLevel;
   final VoidCallback? onTap;
 
-  const _MuteToggleButton({required this.isMuted, this.onTap});
+  const _MuteToggleButton({
+    required this.isMuted,
+    this.audioLevel = 0.0,
+    this.onTap,
+  });
+
+  @override
+  State<_MuteToggleButton> createState() => _MuteToggleButtonState();
+}
+
+class _MuteToggleButtonState extends State<_MuteToggleButton>
+    with TickerProviderStateMixin {
+  late final AnimationController _pressController;
+  late final AnimationController _pulseController;
+  late final Animation<double> _scaleAnim;
+  late final Animation<double> _pulseAnim;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _pressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+    _scaleAnim = Tween<double>(begin: 1.0, end: 1.12).animate(
+      CurvedAnimation(parent: _pressController, curve: Curves.easeOutCubic),
+    );
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+    _pulseAnim = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeOut));
+
+    if (!widget.isMuted) {
+      _pressController.value = 1.0;
+      _pulseController.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _MuteToggleButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final transmitting = !widget.isMuted;
+    final wasTransmitting = !oldWidget.isMuted;
+    if (transmitting && !wasTransmitting) {
+      _pressController.forward();
+      _pulseController.repeat();
+    } else if (!transmitting && wasTransmitting) {
+      _pressController.reverse();
+      _pulseController.stop();
+      _pulseController.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pressController.dispose();
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  void _onTap() {
+    HapticFeedback.mediumImpact();
+    widget.onTap?.call();
+  }
 
   @override
   Widget build(BuildContext context) {
-    const double size = 90;
+    const double baseSize = 90;
+    final bool transmitting = !widget.isMuted;
+    final double levelRing = widget.audioLevel.clamp(0.0, 1.0) * 18;
 
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        onTap?.call();
-      },
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: Material(
-          animationDuration: const Duration(milliseconds: 200),
-          color: isMuted ? AppColors.surfaceVariant : AppColors.accent,
-          shape: CircleBorder(
-            side: BorderSide(
-              color: isMuted
-                  ? AppColors.error.withValues(alpha: 0.5)
-                  : AppColors.accent,
-              width: isMuted ? 1.5 : 2.5,
+    return SizedBox(
+      width: baseSize + 40,
+      height: baseSize + 40,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_scaleAnim, _pulseAnim]),
+        builder: (context, child) {
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              if (transmitting)
+                AnimatedBuilder(
+                  animation: _pulseAnim,
+                  builder: (_, __) {
+                    final v = _pulseAnim.value;
+                    final size = baseSize + v * 36;
+                    return SizedBox(
+                      width: size,
+                      height: size,
+                      child: CustomPaint(
+                        painter: _CircleRingPainter(
+                          color: AppColors.accent
+                              .withValues(alpha: (1 - v) * 0.35),
+                          strokeWidth: 2,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              if (transmitting)
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 80),
+                  width: baseSize + levelRing,
+                  height: baseSize + levelRing,
+                  child: CustomPaint(
+                    painter: _CircleRingPainter(
+                      color: AppColors.accent.withValues(alpha: 0.45),
+                      strokeWidth: 3 + levelRing * 0.15,
+                    ),
+                  ),
+                ),
+              Transform.scale(scale: _scaleAnim.value, child: child),
+            ],
+          );
+        },
+        child: GestureDetector(
+          onTap: _onTap,
+          child: SizedBox(
+            width: baseSize,
+            height: baseSize,
+            child: Material(
+              animationDuration: const Duration(milliseconds: 200),
+              color: transmitting
+                  ? AppColors.accent
+                  : AppColors.surfaceVariant,
+              shape: CircleBorder(
+                side: BorderSide(
+                  color: transmitting
+                      ? AppColors.accent
+                      : AppColors.error.withValues(alpha: 0.5),
+                  width: transmitting ? 2.5 : 1.5,
+                ),
+              ),
+              elevation: transmitting ? 6 : 0,
+              shadowColor: AppColors.accent.withValues(alpha: 0.45),
+              child: Icon(
+                transmitting ? Icons.mic_rounded : Icons.mic_off_rounded,
+                color: transmitting ? Colors.white : AppColors.error,
+                size: 32,
+              ),
             ),
-          ),
-          elevation: isMuted ? 0 : 4,
-          shadowColor: AppColors.accent.withValues(alpha: 0.35),
-          child: Icon(
-            isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
-            color: isMuted ? AppColors.error : Colors.white,
-            size: 32,
           ),
         ),
       ),

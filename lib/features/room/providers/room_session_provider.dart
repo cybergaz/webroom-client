@@ -288,8 +288,13 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
       await call.leave();
     }
 
+    // Everyone joins muted — host and non-host both explicitly unmute when
+    // they want to speak. We do NOT pre-warm the mic track here: the
+    // publish-then-mute sequence left localParticipant.isAudioEnabled in
+    // an inconsistent state so the UI button showed "unmuted" while the
+    // real mic was off. A short first-unmute delay is the trade-off.
     final connectOptions = CallConnectOptions(
-      microphone: isHost ? TrackOption.enabled() : TrackOption.disabled(),
+      microphone: TrackOption.disabled(),
     );
 
     await call
@@ -305,24 +310,6 @@ class RoomSessionNotifier extends AsyncNotifier<RoomSession> {
       } catch (e) {
         print('hostReady failed (non-fatal): $e');
       }
-    } else {
-      // Non-host: pre-warm the mic track. Publishing on join then muting
-      // means the first real unmute only has to flip a flag + re-acquire
-      // the mic (fast) instead of negotiating a fresh track with the SFU
-      // (slow — previously caused first-word drops). Done fire-and-forget
-      // with timeouts so a stuck SFU never blocks or leaves the mic open.
-      () async {
-        try {
-          await call
-              .setMicrophoneEnabled(enabled: true)
-              .timeout(const Duration(seconds: 5));
-          await call
-              .setMicrophoneEnabled(enabled: false)
-              .timeout(const Duration(seconds: 5));
-        } catch (e) {
-          print('mic pre-warm failed (non-fatal): $e');
-        }
-      }();
     }
 
     ref.read(activeCallProvider.notifier).setCall(call);

@@ -278,20 +278,78 @@ class _UserCallView extends ConsumerWidget {
 // Host card
 // ---------------------------------------------------------------------------
 
-class _HostCard extends StatelessWidget {
+class _HostCard extends ConsumerStatefulWidget {
   final Call call;
 
   const _HostCard({required this.call});
 
   @override
+  ConsumerState<_HostCard> createState() => _HostCardState();
+}
+
+class _HostCardState extends ConsumerState<_HostCard> {
+  Timer? _hostAbsenceTimer;
+  bool _hostMissing = false;
+  bool _hostEverSeen = false;
+
+  void _armTimer() {
+    _hostAbsenceTimer?.cancel();
+    _hostAbsenceTimer = Timer(const Duration(seconds: 12), () {
+      if (!mounted) return;
+      setState(() => _hostMissing = true);
+    });
+  }
+
+  void _cancelTimer() {
+    _hostAbsenceTimer?.cancel();
+    _hostAbsenceTimer = null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _armTimer();
+  }
+
+  @override
+  void dispose() {
+    _cancelTimer();
+    super.dispose();
+  }
+
+  void _syncFromParticipants(bool hostPresent) {
+    if (hostPresent && !_hostEverSeen) {
+      _hostEverSeen = true;
+      _cancelTimer();
+      if (_hostMissing) {
+        // deferred: setState from stream callback is safe here
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _hostMissing = false);
+        });
+      }
+    } else if (!hostPresent && _hostEverSeen && _hostAbsenceTimer == null) {
+      // Host left after being seen — re-arm timer.
+      _hostEverSeen = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _hostMissing = false);
+          _armTimer();
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return StreamBuilder<CallState>(
-      stream: call.state.valueStream,
-      initialData: call.state.valueOrNull,
+      stream: widget.call.state.valueStream,
+      initialData: widget.call.state.valueOrNull,
       builder: (context, snapshot) {
         final participants = snapshot.data?.callParticipants ?? [];
-        final hostList = participants.where((p) => p.roles.contains('host')).toList();
+        final hostList =
+            participants.where((p) => p.roles.contains('host')).toList();
         final host = hostList.isEmpty ? null : hostList.first;
+        _syncFromParticipants(host != null);
         final speaking = host?.isSpeaking ?? false;
 
         return Padding(
@@ -318,7 +376,18 @@ class _HostCard extends StatelessWidget {
                     ]
                   : null,
             ),
-            child: host == null ? const _WaitingHost() : _HostInfo(host: host),
+            child: host != null
+                ? _HostInfo(host: host)
+                : _hostMissing
+                    ? _HostOffline(
+                        onLeave: () async {
+                          final session =
+                              ref.read(roomSessionProvider.notifier);
+                          if (context.mounted) context.go('/home');
+                          await session.leaveRoom();
+                        },
+                      )
+                    : const _WaitingHost(),
           ),
         );
       },
@@ -349,6 +418,58 @@ class _WaitingHost extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _HostOffline extends StatelessWidget {
+  final Future<void> Function() onLeave;
+
+  const _HostOffline({required this.onLeave});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.cloud_off_rounded,
+            size: 40,
+            color: AppColors.warning,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Host is offline',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'The host has not joined yet. Please leave and try again later.',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 14),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.logout_rounded, size: 18),
+            label: const Text('Leave Room'),
+            onPressed: onLeave,
+          ),
+        ],
+      ),
     );
   }
 }

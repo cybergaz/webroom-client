@@ -41,7 +41,24 @@ class GetstreamStateNotifier extends Notifier<GetstreamState> {
     required String getstreamToken,
     required UserRole role,
   }) async {
-    if (state.isInitialized && StreamVideo.isInitialized()) return;
+    // Fast path: if the singleton exists AND the coordinator WebSocket is
+    // actually connected, we're done. Checking only `isInitialized()` isn't
+    // enough — after long-lived usage the WS can silently drop, leaving the
+    // singleton in place but unusable (host joins "connected" but the SFU
+    // never sees them, which is the ghost-room symptom).
+    if (state.isInitialized && StreamVideo.isInitialized()) {
+      try {
+        final conn = StreamVideo.instance.state.connection.value;
+        if (conn.isConnected) return;
+        // Connected in our local state but SDK is actually disconnected.
+        // Re-connect the existing singleton without rebuilding it.
+        final result = await StreamVideo.instance.connect();
+        if (result.isSuccess) return;
+        print('StreamVideo reconnect failed, rebuilding singleton: $result');
+      } catch (e) {
+        print('StreamVideo health check failed, rebuilding singleton: $e');
+      }
+    }
 
     // Defensive: a stale singleton can survive dispose() in some SDK versions.
     if (StreamVideo.isInitialized()) {

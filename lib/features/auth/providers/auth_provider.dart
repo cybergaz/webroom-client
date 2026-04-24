@@ -143,7 +143,13 @@ class AuthNotifier extends Notifier<AuthState> {
     state = AuthState.authenticated(user: result.user);
   }
 
-  void forceLogout() {
+  Future<void> forceLogout() async {
+    try {
+      await ref.read(secureStorageProvider).deleteAll();
+    } catch (_) {}
+    try {
+      await ref.read(getstreamStateProvider.notifier).dispose();
+    } catch (_) {}
     state = const AuthState.unauthenticated();
   }
 
