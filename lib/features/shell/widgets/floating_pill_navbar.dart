@@ -1,13 +1,16 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../domain/enums/user_role.dart';
+import '../../auth/providers/auth_provider.dart';
 
-enum NavDestination { rooms, recordings, sessionHistory, settings }
+enum NavDestination { rooms, users, recordings, sessionHistory, settings }
 
-class FloatingPillNavBar extends StatelessWidget {
+class FloatingPillNavBar extends ConsumerWidget {
   final NavDestination current;
 
   const FloatingPillNavBar({super.key, required this.current});
@@ -22,7 +25,13 @@ class FloatingPillNavBar extends StatelessWidget {
       height + bottomInset + MediaQuery.of(context).padding.bottom;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+    final isHost = switch (authState) {
+      AuthStateAuthenticated(:final user) => user.role == UserRole.host,
+      _ => false,
+    };
+
     return SafeArea(
       top: false,
       child: Padding(
@@ -63,6 +72,15 @@ class FloatingPillNavBar extends StatelessWidget {
                       onTap: () => context.go('/home'),
                     ),
                   ),
+                  if (isHost)
+                    Expanded(
+                      child: _NavButton(
+                        icon: Icons.people_alt_rounded,
+                        label: 'Users',
+                        active: current == NavDestination.users,
+                        onTap: () => context.go('/host-users'),
+                      ),
+                    ),
                   Expanded(
                     child: _NavButton(
                       icon: Icons.mic_external_on_rounded,

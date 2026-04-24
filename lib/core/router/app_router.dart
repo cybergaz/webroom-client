@@ -13,6 +13,9 @@ import '../../features/auth/screens/login_screen.dart';
 import '../../features/room/screens/user_room_screen.dart';
 import '../../features/room/screens/admin_room_screen.dart';
 import '../../features/room/screens/room_members_screen.dart';
+import '../../features/host_users/screens/host_users_screen.dart';
+import '../../features/host_users/screens/host_user_detail_screen.dart';
+import '../../features/host_users/screens/host_user_edit_screen.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/shell/widgets/app_shell.dart';
 import '../../domain/enums/user_role.dart';
@@ -83,6 +86,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const HomeScreen(),
           ),
           GoRoute(
+            path: '/host-users',
+            name: 'host-users',
+            redirect: (context, state) => _requireHost(ref),
+            builder: (context, state) => const HostUsersScreen(),
+            routes: [
+              GoRoute(
+                path: ':userId',
+                name: 'host-user-detail',
+                builder: (context, state) => HostUserDetailScreen(
+                  userId: state.pathParameters['userId']!,
+                ),
+              ),
+              GoRoute(
+                path: ':userId/edit',
+                name: 'host-user-edit',
+                builder: (context, state) => HostUserEditScreen(
+                  userId: state.pathParameters['userId']!,
+                ),
+              ),
+            ],
+          ),
+          GoRoute(
             path: '/recordings',
             name: 'recordings',
             builder: (context, state) => const RecordingsScreen(),
@@ -149,6 +174,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+String? _requireHost(Ref ref) {
+  final authState = ref.read(authStateProvider);
+  final isHost = switch (authState) {
+    AuthStateAuthenticated(:final user) => user.role == UserRole.host,
+    _ => false,
+  };
+  return isHost ? null : '/home';
+}
 
 /// Tracks whether the user is currently on a room screen.
 /// Room screens set this to true on init and false on dispose.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/web_max_width.dart';
 import '../../shell/widgets/floating_pill_navbar.dart';
 import '../models/session_history_entry.dart';
 import '../providers/session_history_provider.dart';
@@ -32,29 +33,31 @@ class SessionHistoryScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: historyAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => const Center(
-          child: Text(
-            'Failed to load history',
-            style: TextStyle(color: AppColors.error),
-          ),
-        ),
-        data: (entries) {
-          if (entries.isEmpty) {
-            return const _EmptyState();
-          }
-          return ListView.builder(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              8,
-              16,
-              FloatingPillNavBar.bottomPadding(context) + 8,
+      body: WebMaxWidth(
+        child: historyAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => const Center(
+            child: Text(
+              'Failed to load history',
+              style: TextStyle(color: AppColors.error),
             ),
-            itemCount: entries.length,
-            itemBuilder: (context, i) => _HistoryTile(entry: entries[i]),
-          );
-        },
+          ),
+          data: (entries) {
+            if (entries.isEmpty) {
+              return const _EmptyState();
+            }
+            return ListView.builder(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                FloatingPillNavBar.bottomPadding(context) + 8,
+              ),
+              itemCount: entries.length,
+              itemBuilder: (context, i) => _HistoryTile(entry: entries[i]),
+            );
+          },
+        ),
       ),
     );
   }

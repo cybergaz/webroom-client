@@ -13,6 +13,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/error_mapper.dart';
 import '../../../domain/enums/room_status.dart';
 import '../../../domain/enums/user_role.dart';
+import '../../../shared/widgets/web_max_width.dart';
 import '../../room/providers/getstream_provider.dart';
 import '../../room/providers/room_session_provider.dart';
 
@@ -43,7 +44,8 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: SafeArea(
+      body: WebMaxWidth(
+        child: SafeArea(
         bottom: false,
         child: Column(
           children: [
@@ -134,6 +136,7 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
           ],
+        ),
         ),
       ),
       // floatingActionButton: user?.role == UserRole.host

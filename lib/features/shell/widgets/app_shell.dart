@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../shared/widgets/web_max_width.dart';
 import 'floating_pill_navbar.dart';
 
 /// Persistent shell that keeps the pill navbar mounted across tab navigations.
@@ -24,7 +25,9 @@ class AppShell extends StatelessWidget {
             left: 0,
             right: 0,
             bottom: 0,
-            child: FloatingPillNavBar(current: current),
+            child: WebMaxWidth(
+              child: FloatingPillNavBar(current: current),
+            ),
           ),
       ],
     );
@@ -32,6 +35,7 @@ class AppShell extends StatelessWidget {
 
   NavDestination? _destinationForLocation(String path) {
     if (path.startsWith('/home')) return NavDestination.rooms;
+    if (path.startsWith('/host-users')) return NavDestination.users;
     if (path.startsWith('/recordings')) return NavDestination.recordings;
     if (path.startsWith('/session-history')) {
       return NavDestination.sessionHistory;

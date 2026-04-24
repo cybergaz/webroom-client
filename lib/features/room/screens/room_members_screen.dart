@@ -4,6 +4,7 @@ import '../providers/room_participants_provider.dart';
 import '../../../data/models/room_member_model.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/error_mapper.dart';
+import '../../../shared/widgets/web_max_width.dart';
 
 class RoomMembersScreen extends ConsumerWidget {
   final String roomId;
@@ -43,7 +44,7 @@ class RoomMembersScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: participantsAsync.when(
+      body: WebMaxWidth(child: participantsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Column(
@@ -91,7 +92,7 @@ class RoomMembersScreen extends ConsumerWidget {
             },
           );
         },
-      ),
+      )),
     );
   }
 }

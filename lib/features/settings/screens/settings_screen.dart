@@ -8,6 +8,7 @@ import '../../../core/utils/clipboard_util.dart';
 import '../../../data/models/user_model.dart';
 import '../../../domain/enums/user_role.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/web_max_width.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../shell/widgets/floating_pill_navbar.dart';
 
@@ -26,7 +27,8 @@ class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
+      body: WebMaxWidth(
+        child: SafeArea(
         bottom: false,
         child: ListView(
           padding: EdgeInsets.fromLTRB(
@@ -56,6 +58,7 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 20),
             _AppInfoCard(role: user.role),
           ],
+        ),
         ),
       ),
     );

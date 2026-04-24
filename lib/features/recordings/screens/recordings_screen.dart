@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/web_max_width.dart';
 import '../../shell/widgets/floating_pill_navbar.dart';
 import '../../../data/models/my_recording_model.dart';
 import '../../../data/models/room_model.dart';
@@ -121,7 +122,7 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
         title: const Text('My Recordings'),
         automaticallyImplyLeading: false,
       ),
-      body: roomsAsync.when(
+      body: WebMaxWidth(child: roomsAsync.when(
         loading: () => const Center(
           child: CircularProgressIndicator(color: AppColors.accent),
         ),
@@ -185,7 +186,7 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
             ),
           );
         },
-      ),
+      )),
     );
   }
 
@@ -213,7 +214,7 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: WebMaxWidth(child: Column(
         children: [
           // ─── Filter bar ───────────────────────────────────────────────────
           Container(
@@ -314,7 +315,7 @@ class _RecordingsScreenState extends ConsumerState<RecordingsScreen> {
                   ),
           ),
         ],
-      ),
+      )),
     );
   }
 }

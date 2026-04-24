@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/web_max_width.dart';
 
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key});
@@ -87,7 +88,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           onPressed: () => context.pop(),
         ),
       ),
-      body: ListView(
+      body: WebMaxWidth(child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
           const Text(
@@ -116,7 +117,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             const SizedBox(height: 20),
           ],
         ],
-      ),
+      )),
     );
   }
 }
