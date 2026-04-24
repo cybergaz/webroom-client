@@ -44,8 +44,6 @@ Future<void> initDeviceId(SecureStorageService storage) async {
       default:
         _deviceId = 'Unknown';
     }
-    // // final deviceInfo = await deviceInfo.deviceInfo;
-    // _deviceId = const Uuid().v4();
     await storage.write(StorageKeys.deviceId, _deviceId!);
   }
 }
