@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:stream_video/stream_video.dart';
 
 import '../providers/getstream_provider.dart';
+import '../providers/host_recording_provider.dart';
 import '../providers/odds_provider.dart';
 import '../providers/room_session_provider.dart';
 import '../widgets/banner_slider.dart';
@@ -591,16 +592,16 @@ class _StatusBadge extends StatelessWidget {
 // Mic toggle area — single-tap mute/unmute
 // ---------------------------------------------------------------------------
 
-class _MicToggleArea extends StatefulWidget {
+class _MicToggleArea extends ConsumerStatefulWidget {
   final Call call;
 
   const _MicToggleArea({required this.call});
 
   @override
-  State<_MicToggleArea> createState() => _MicToggleAreaState();
+  ConsumerState<_MicToggleArea> createState() => _MicToggleAreaState();
 }
 
-class _MicToggleAreaState extends State<_MicToggleArea>
+class _MicToggleAreaState extends ConsumerState<_MicToggleArea>
     with TickerProviderStateMixin {
   late final AnimationController _pressCtrl;
   late final AnimationController _pulseCtrl;
@@ -648,12 +649,18 @@ class _MicToggleAreaState extends State<_MicToggleArea>
   Future<void> _toggle(bool currentlyUnmuted) async {
     if (_busy) return;
     _busy = true;
+    final willUnmute = !currentlyUnmuted;
     HapticFeedback.mediumImpact();
     try {
       await widget.call
-          .setMicrophoneEnabled(enabled: !currentlyUnmuted)
+          .setMicrophoneEnabled(enabled: willUnmute)
           .timeout(const Duration(seconds: 5));
     } catch (_) {}
+    if (willUnmute) {
+      ref.read(hostRecordingProvider.notifier).onUnmute();
+    } else {
+      ref.read(hostRecordingProvider.notifier).onMute();
+    }
     _busy = false;
   }
 
